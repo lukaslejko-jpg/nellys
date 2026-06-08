@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Nellys">
+  <rect width="128" height="128" rx="24" fill="#172033"/>
+  <path d="M64 16 112 100H16L64 16Z" fill="#f5b833"/>
+  <path d="M64 16 88 58H40L64 16Z" fill="#e23d3d"/>
+  <path d="M40 58h48l24 42H16l24-42Z" fill="#2b6fe8"/>
+  <path d="M64 58 88 100H40l24-42Z" fill="#24a36a"/>
+</svg>
