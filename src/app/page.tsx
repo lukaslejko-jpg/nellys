@@ -6,8 +6,8 @@ export default function HomePage() {
       <header className="topbar">
         <div className="brand">Nellys <span>Solver</span></div>
         <nav className="nav" aria-label="Hlavna navigacia">
-          <Link className="button secondary" href="/app">Aplikacia</Link>
-          <Link className="button" href="/admin">Admin</Link>
+          <Link className="button secondary" href="/auth/login">Prihlasenie</Link>
+          <Link className="button" href="/auth/register">Registracia</Link>
         </nav>
       </header>
 
@@ -19,7 +19,7 @@ export default function HomePage() {
             ale kazdy tah vypocita a overi deterministicky solver.
           </p>
           <div className="nav">
-            <Link className="button" href="/app">Zacat manualnym zadanim</Link>
+            <Link className="button" href="/auth/register">Zacat manualnym zadanim</Link>
             <Link className="button secondary" href="/admin">Sprava</Link>
           </div>
         </div>

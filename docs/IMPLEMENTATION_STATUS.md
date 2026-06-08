@@ -65,6 +65,11 @@
   - framework-independent auth API handlers,
   - Next.js register/login routes,
   - handler tests over in-memory auth repository.
+- Added first UI auth flow:
+  - register page,
+  - login page,
+  - reusable client auth form,
+  - dashboard copy updated to show current Phase 1 state honestly.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
