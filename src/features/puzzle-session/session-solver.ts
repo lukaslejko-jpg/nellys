@@ -6,7 +6,7 @@ export function solveManualSession(session: PuzzleSessionSnapshot): SessionSolve
     return {
       ok: false,
       code: "MISSING_STATE",
-      messageSk: "Najprv zadaj a potvrď stav Pyraminxu."
+      messageSk: "Najprv zadaj a potvrd stav Pyraminxu."
     };
   }
 

@@ -33,6 +33,13 @@
   - manual session solve wrapper,
   - auth input contracts,
   - Prisma seed SQL for subscription plans.
+- Added tested session use-case layer:
+  - repository contract,
+  - in-memory repository for unit tests,
+  - manual session creation,
+  - corrected state persistence,
+  - ownership checks,
+  - admin session access override.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
@@ -43,7 +50,7 @@ Passed locally in Codex:
 node --test --experimental-strip-types tests/unit/*.test.ts
 ```
 
-Latest result: 8 tests passed.
+Latest result: 12 tests passed.
 
 Not run in the Codex environment:
 
