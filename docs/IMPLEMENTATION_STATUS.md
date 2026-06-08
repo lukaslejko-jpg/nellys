@@ -60,6 +60,11 @@
   - Prisma auth repository,
   - bcrypt password hasher,
   - auth service factory.
+- Added auth API layer:
+  - register/login request contracts,
+  - framework-independent auth API handlers,
+  - Next.js register/login routes,
+  - handler tests over in-memory auth repository.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
@@ -70,7 +75,7 @@ Passed locally in Codex:
 node --test --experimental-strip-types tests/unit/*.test.ts
 ```
 
-Latest result: 24 tests passed.
+Latest result: 29 tests passed.
 
 Not run in the Codex environment:
 
