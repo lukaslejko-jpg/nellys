@@ -4,7 +4,7 @@
 
 Recommended repository name: `nellys`.
 
-Before the first push:
+Before the first full verification:
 
 ```bash
 npm install
@@ -14,6 +14,9 @@ npm run typecheck
 npm run test
 npm run build
 ```
+
+Commit `package-lock.json` after the first successful `npm install`. After that,
+switch GitHub Actions from `npm install` back to `npm ci`.
 
 Then initialize and push:
 

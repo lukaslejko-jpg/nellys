@@ -27,16 +27,23 @@
   - bounded deterministic solver,
   - solution verification.
 - Added unit tests for solved state, inverses, inverse sequences and short deterministic scrambles.
+- Added Phase 1 service foundations:
+  - default billing plan definitions,
+  - monthly solve limit checks,
+  - manual session solve wrapper,
+  - auth input contracts,
+  - Prisma seed SQL for subscription plans.
+- Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
 
 Passed locally in Codex:
 
 ```text
-node --test --experimental-strip-types tests/unit/pyraminx.test.ts
+node --test --experimental-strip-types tests/unit/*.test.ts
 ```
 
-Result: 4 tests passed.
+Latest result: 8 tests passed.
 
 Not run in the Codex environment:
 
