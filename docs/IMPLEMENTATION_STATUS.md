@@ -40,6 +40,10 @@
   - corrected state persistence,
   - ownership checks,
   - admin session access override.
+- Added Prisma persistence adapter preparation:
+  - Prisma client singleton,
+  - Prisma session repository,
+  - mapper between Prisma JSON/enums and domain session snapshots.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
@@ -50,7 +54,7 @@ Passed locally in Codex:
 node --test --experimental-strip-types tests/unit/*.test.ts
 ```
 
-Latest result: 12 tests passed.
+Latest result: 14 tests passed.
 
 Not run in the Codex environment:
 
