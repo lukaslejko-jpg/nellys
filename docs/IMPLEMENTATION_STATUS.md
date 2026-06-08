@@ -55,6 +55,11 @@
   - password hasher interface,
   - registration and login service,
   - duplicate email and invalid credential tests.
+- Added auth persistence preparation:
+  - Prisma auth mapper,
+  - Prisma auth repository,
+  - bcrypt password hasher,
+  - auth service factory.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
@@ -65,7 +70,7 @@ Passed locally in Codex:
 node --test --experimental-strip-types tests/unit/*.test.ts
 ```
 
-Latest result: 22 tests passed.
+Latest result: 24 tests passed.
 
 Not run in the Codex environment:
 
