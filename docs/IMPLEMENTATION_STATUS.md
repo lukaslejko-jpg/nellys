@@ -70,6 +70,13 @@
   - login page,
   - reusable client auth form,
   - dashboard copy updated to show current Phase 1 state honestly.
+- Added server-side session foundation:
+  - `UserSession` Prisma model,
+  - opaque session token service,
+  - token hashing,
+  - in-memory and Prisma session repositories,
+  - session create/verify/revoke service,
+  - login route HTTP-only cookie metadata.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
@@ -80,7 +87,7 @@ Passed locally in Codex:
 node --test --experimental-strip-types tests/unit/*.test.ts
 ```
 
-Latest result: 29 tests passed.
+Latest result: 33 tests passed.
 
 Not run in the Codex environment:
 
