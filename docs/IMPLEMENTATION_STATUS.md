@@ -49,6 +49,12 @@
   - framework-independent API handlers,
   - Next.js API routes for create session, save state and solve,
   - handler tests over in-memory repository.
+- Added auth service foundation:
+  - user repository contract,
+  - in-memory auth repository for tests,
+  - password hasher interface,
+  - registration and login service,
+  - duplicate email and invalid credential tests.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
@@ -59,7 +65,7 @@ Passed locally in Codex:
 node --test --experimental-strip-types tests/unit/*.test.ts
 ```
 
-Latest result: 18 tests passed.
+Latest result: 22 tests passed.
 
 Not run in the Codex environment:
 
