@@ -697,6 +697,11 @@ h2 {
   padding: 14px;
 }
 
+.primary-guide {
+  border-color: #7fb1ff;
+  box-shadow: 0 12px 28px rgba(45, 108, 223, 0.12);
+}
+
 .ai-guide > div > span {
   background: var(--blue);
   border-radius: 8px;
@@ -759,6 +764,57 @@ h2 {
   margin: 0;
 }
 
+.live-coach {
+  background: #ffffff;
+  border: 2px solid #2d6cdf;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.live-coach small {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.live-coach strong {
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.live-coach p {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.coach-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1.2fr minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.coach-actions .button {
+  width: 100%;
+}
+
+.all-guide-steps {
+  margin: 0;
+}
+
+.all-guide-steps summary {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.all-guide-steps .guide-steps {
+  margin-top: 10px;
+}
+
 .ai-boundaries {
   background: #ffffff;
   border: 1px solid var(--line);
@@ -799,6 +855,23 @@ h2 {
 .suggestion-list p {
   color: var(--muted);
   margin: 0;
+}
+
+.advanced-inspection {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0;
+  padding: 12px;
+}
+
+.advanced-inspection summary {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.advanced-inspection .inspection-panel {
+  margin-top: 12px;
 }
 
 details {
@@ -859,6 +932,7 @@ pre {
 
   .status-grid,
   .three-actions,
+  .coach-actions,
   .capture-mode,
   .photo-grid,
   .sticker-grid,
