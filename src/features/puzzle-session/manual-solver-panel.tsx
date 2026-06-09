@@ -161,11 +161,14 @@ export function PhotoUploadPanel() {
   const [activeMediaName, setActiveMediaName] = useState("");
   const [activeFace, setActiveFace] = useState<PyraminxFaceId>("U");
   const [captureMode, setCaptureMode] = useState<"photos" | "video">("photos");
+  const [coachStep, setCoachStep] = useState(0);
   const [draft, setDraft] = useState<InspectionDraft>(() => createEmptyInspectionDraft());
   const [status, setStatus] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
   const validation = validateInspectionDraft(draft);
   const guide = createInspectionGuide(draft, { mode: captureMode, hasMedia: media.length > 0 });
+  const coachSteps = buildCoachSteps(captureMode, media.length);
+  const currentCoachStep = coachSteps[Math.min(coachStep, coachSteps.length - 1)];
 
   useEffect(() => {
     return () => {
@@ -184,6 +187,7 @@ export function PhotoUploadPanel() {
     media.forEach((item) => URL.revokeObjectURL(item.url));
     setMedia(nextMedia);
     setActiveMediaName(nextMedia[0]?.name ?? "");
+    setCoachStep(0);
     setDraft(
       nextMedia[0]
         ? assignCaptureMedia(createEmptyInspectionDraft(), "U", nextMedia[0].name)
@@ -262,6 +266,28 @@ export function PhotoUploadPanel() {
     setStatus("Hlasove citanie je zastavene.");
   }
 
+  function nextCoachStep() {
+    setCoachStep((current) => Math.min(current + 1, coachSteps.length - 1));
+    setStatus("Dalsi pokyn je pripraveny.");
+  }
+
+  function resetCoachStep() {
+    setCoachStep(0);
+    setStatus(
+      captureMode === "video"
+        ? "Zacni znova: chyt ihlan spickou hore a ukaz prvu celu stranu."
+        : "Zacni znova: skontroluj prvu fotku a potom dopln dalsie strany."
+    );
+  }
+
+  function markMediaProblem() {
+    setStatus(
+      captureMode === "video"
+        ? "Natoc video znova pomalsie. Na kazdej strane zastav a pocitaj jeden, dva."
+        : "Nahraj ostrejsiu fotku. Strana musi byt cela v zabere a bez odlesku."
+    );
+  }
+
   return (
     <div className="manual-solver">
       <div>
@@ -337,14 +363,33 @@ export function PhotoUploadPanel() {
               <h3>{guide.title}</h3>
               <p>{guide.summary}</p>
             </div>
-            <ol className="guide-steps">
-              {guide.nextActions.map((action, index) => (
-                <li key={action}>
-                  <span>{index + 1}</span>
-                  <p>{action}</p>
-                </li>
-              ))}
-            </ol>
+            <div className="live-coach" aria-live="polite">
+              <small>Krok {Math.min(coachStep + 1, coachSteps.length)} z {coachSteps.length}</small>
+              <strong>{currentCoachStep.title}</strong>
+              <p>{currentCoachStep.body}</p>
+            </div>
+            <div className="coach-actions">
+              <button className="button" onClick={nextCoachStep} type="button">
+                Hotovo, dalsi krok
+              </button>
+              <button className="button secondary" onClick={markMediaProblem} type="button">
+                Nevidim dobre
+              </button>
+              <button className="button secondary" onClick={resetCoachStep} type="button">
+                Zacat znova
+              </button>
+            </div>
+            <details className="all-guide-steps">
+              <summary>Zobrazit vsetky kroky</summary>
+              <ol className="guide-steps">
+                {guide.nextActions.map((action, index) => (
+                  <li key={action}>
+                    <span>{index + 1}</span>
+                    <p>{action}</p>
+                  </li>
+                ))}
+              </ol>
+            </details>
             <div className="ai-boundaries">
               {guide.aiBoundaries.map((boundary) => (
                 <p key={boundary}>{boundary}</p>
@@ -365,66 +410,66 @@ export function PhotoUploadPanel() {
 
           <details className="advanced-inspection">
             <summary>Pokrocile: rucne overit farby</summary>
-            <div className="inspection-panel">
-              <div className="state-summary">
-                <span>Aktivny subor</span>
-                <strong>{activeMediaName || "ziadny"}</strong>
-              </div>
-              <div className="face-tabs" aria-label="Strany Pyraminxu">
-                {pyraminxFaceIds.map((face) => (
-                  <button
-                    className={activeFace === face ? "face-tab active" : "face-tab"}
-                    key={face}
-                    onClick={() => assignMediaToFace(face)}
-                    type="button"
-                  >
-                    {face}
-                  </button>
-                ))}
-              </div>
-              <div className="sticker-board">
-                {draft.captures
-                  .filter((capture) => capture.face === activeFace)
-                  .map((capture) => (
-                    <div key={capture.face}>
-                      <p className="muted">
-                        Strana {capture.face}: {capture.mediaName || "bez priradenej fotky"}
-                      </p>
-                      <div className="sticker-grid">
-                        {capture.colors.map((selected, index) => (
-                          <div className="sticker-cell" key={`${capture.face}-${index}`}>
-                            <span>bod {index + 1}</span>
-                            <div className="swatch-row">
-                              {stickerColorIds.map((color) => (
-                                <button
-                                  aria-label={`Nastavit ${color} pre ${capture.face} bod ${index + 1}`}
-                                  className={selected === color ? `swatch ${color} active` : `swatch ${color}`}
-                                  key={color}
-                                  onClick={() => setStickerColor(capture.face, index as 0 | 1 | 2, color)}
-                                  type="button"
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-              <button className="button" onClick={confirmInspection} type="button">
-                Overit foto inspekciu
-              </button>
-              <div className={validation.ok ? "solution-box" : "inspection-warning"}>
-                <span>{validation.ok ? "Pripravene" : "Chyba podklad"}</span>
-                <p>{validation.messageSk}</p>
-                {!validation.ok ? (
-                  <p>
-                    Chybaju strany: {validation.missingFaces.length ? validation.missingFaces.join(", ") : "ziadne"}.
-                    Neoznacene body: {validation.missingStickers}.
-                  </p>
-                ) : null}
-              </div>
+          <div className="inspection-panel">
+            <div className="state-summary">
+              <span>Aktivny subor</span>
+              <strong>{activeMediaName || "ziadny"}</strong>
             </div>
+            <div className="face-tabs" aria-label="Strany Pyraminxu">
+              {pyraminxFaceIds.map((face) => (
+                <button
+                  className={activeFace === face ? "face-tab active" : "face-tab"}
+                  key={face}
+                  onClick={() => assignMediaToFace(face)}
+                  type="button"
+                >
+                  {face}
+                </button>
+              ))}
+            </div>
+            <div className="sticker-board">
+              {draft.captures
+                .filter((capture) => capture.face === activeFace)
+                .map((capture) => (
+                  <div key={capture.face}>
+                    <p className="muted">
+                      Strana {capture.face}: {capture.mediaName || "bez priradenej fotky"}
+                    </p>
+                    <div className="sticker-grid">
+                      {capture.colors.map((selected, index) => (
+                        <div className="sticker-cell" key={`${capture.face}-${index}`}>
+                          <span>bod {index + 1}</span>
+                          <div className="swatch-row">
+                            {stickerColorIds.map((color) => (
+                              <button
+                                aria-label={`Nastavit ${color} pre ${capture.face} bod ${index + 1}`}
+                                className={selected === color ? `swatch ${color} active` : `swatch ${color}`}
+                                key={color}
+                                onClick={() => setStickerColor(capture.face, index as 0 | 1 | 2, color)}
+                                type="button"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+            </div>
+            <button className="button" onClick={confirmInspection} type="button">
+              Overit foto inspekciu
+            </button>
+            <div className={validation.ok ? "solution-box" : "inspection-warning"}>
+              <span>{validation.ok ? "Pripravene" : "Chyba podklad"}</span>
+              <p>{validation.messageSk}</p>
+              {!validation.ok ? (
+                <p>
+                  Chybaju strany: {validation.missingFaces.length ? validation.missingFaces.join(", ") : "ziadne"}.
+                  Neoznacene body: {validation.missingStickers}.
+                </p>
+              ) : null}
+            </div>
+          </div>
           </details>
         </div>
       ) : null}
@@ -437,6 +482,64 @@ export function PhotoUploadPanel() {
       </div>
     </div>
   );
+}
+
+function buildCoachSteps(mode: "photos" | "video", mediaCount: number): { title: string; body: string }[] {
+  if (mode === "video") {
+    return [
+      {
+        title: "Chyt ihlan spickou hore.",
+        body: "Daj jednu celu farebnu stranu rovno pred kameru. Nehyb sa a pocitaj jeden, dva."
+      },
+      {
+        title: "Otoc ihlan doprava.",
+        body: "Ukaz druhu stranu. Zastav na dve sekundy, aby bola strana ostra."
+      },
+      {
+        title: "Otoc ihlan este raz doprava.",
+        body: "Ukaz tretiu stranu. Drz ju v strede obrazu."
+      },
+      {
+        title: "Otoc ihlan na poslednu stranu.",
+        body: "Ukaz stvrtu stranu. Zase chvilu stoj."
+      },
+      {
+        title: "Naklon ihlan trochu hore a dole.",
+        body: "Tak bude vidno aj hrany medzi farbami. Ak sa obraz trasie, natoc video znova pomalsie."
+      },
+      {
+        title: "Video je pripravene na kontrolu.",
+        body: "Ak boli vsetky styri strany ostre, pokracuj. Ak nie, stlac Nevidim dobre a nahraj nove video."
+      }
+    ];
+  }
+
+  const missing = Math.max(0, 4 - mediaCount);
+  return [
+    {
+      title: mediaCount >= 4 ? "Mas dost fotiek." : `Chybaju este ${missing} fotky.`,
+      body:
+        mediaCount >= 4
+          ? "Teraz skontroluj, ci kazda fotka ukazuje jednu celu stranu ihlanu."
+          : "Potrebujeme styri ostre fotky. Kazda fotka ma ukazat inu celu stranu ihlanu."
+    },
+    {
+      title: "Skontroluj prvu fotku.",
+      body: "Je strana cela v zabere? Ak nie, odfot ju znova."
+    },
+    {
+      title: "Otoc ihlan doprava a odfot dalsiu stranu.",
+      body: "Nepotrebujes poznat nazvy stran. Len ukaz dalsiu farebnu stranu."
+    },
+    {
+      title: "Zopakuj to, kym mas styri strany.",
+      body: "Kazda strana ma byt ostra, bez odlesku a v strede fotky."
+    },
+    {
+      title: "Fotky su pripravene na kontrolu.",
+      body: "Ak niektora fotka chyba alebo je rozmazana, nahraj ju znova."
+    }
+  ];
 }
 
 async function postJson<T>(url: string): Promise<T> {
