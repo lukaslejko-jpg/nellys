@@ -394,9 +394,12 @@ export function PhotoUploadPanel() {
                 <h3>{guide.title}</h3>
                 <p>{guide.summary}</p>
               </div>
-              <ol>
-                {guide.nextActions.map((action) => (
-                  <li key={action}>{action}</li>
+              <ol className="guide-steps">
+                {guide.nextActions.map((action, index) => (
+                  <li key={action}>
+                    <span>{index + 1}</span>
+                    <p>{action}</p>
+                  </li>
                 ))}
               </ol>
               <div className="ai-boundaries">
