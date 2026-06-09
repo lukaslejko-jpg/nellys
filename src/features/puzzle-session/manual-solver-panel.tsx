@@ -165,7 +165,7 @@ export function PhotoUploadPanel() {
   const [status, setStatus] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
   const validation = validateInspectionDraft(draft);
-  const guide = createInspectionGuide(draft);
+  const guide = createInspectionGuide(draft, { mode: captureMode, hasMedia: media.length > 0 });
 
   useEffect(() => {
     return () => {
@@ -191,7 +191,9 @@ export function PhotoUploadPanel() {
     );
     setStatus(
       files.length > 0
-        ? "Prvy subor som priradil strane U. Ak patri inej strane, vyber fotku a klikni spravnu stranu."
+        ? captureMode === "video"
+          ? "Video je nahrate. Pozri si AI pokyny a ukaz ihlan pomaly zo vsetkych stran."
+          : "Fotky su nahrate. Pozri si AI pokyny a skontroluj, ci vidno cele strany ihlanu."
         : ""
     );
   }
@@ -329,105 +331,109 @@ export function PhotoUploadPanel() {
             ))}
           </div>
 
-          <div className="inspection-panel">
-            <div className="state-summary">
-              <span>Aktivny subor</span>
-              <strong>{activeMediaName || "ziadny"}</strong>
+          <div className="ai-guide primary-guide">
+            <div>
+              <span>AI</span>
+              <h3>{guide.title}</h3>
+              <p>{guide.summary}</p>
             </div>
-            <div className="face-tabs" aria-label="Strany Pyraminxu">
-              {pyraminxFaceIds.map((face) => (
-                <button
-                  className={activeFace === face ? "face-tab active" : "face-tab"}
-                  key={face}
-                  onClick={() => assignMediaToFace(face)}
-                  type="button"
-                >
-                  {face}
-                </button>
+            <ol className="guide-steps">
+              {guide.nextActions.map((action, index) => (
+                <li key={action}>
+                  <span>{index + 1}</span>
+                  <p>{action}</p>
+                </li>
+              ))}
+            </ol>
+            <div className="ai-boundaries">
+              {guide.aiBoundaries.map((boundary) => (
+                <p key={boundary}>{boundary}</p>
               ))}
             </div>
-            <div className="sticker-board">
-              {draft.captures
-                .filter((capture) => capture.face === activeFace)
-                .map((capture) => (
-                  <div key={capture.face}>
-                    <p className="muted">
-                      Strana {capture.face}: {capture.mediaName || "bez priradenej fotky"}
-                    </p>
-                    <div className="sticker-grid">
-                      {capture.colors.map((selected, index) => (
-                        <div className="sticker-cell" key={`${capture.face}-${index}`}>
-                          <span>bod {index + 1}</span>
-                          <div className="swatch-row">
-                            {stickerColorIds.map((color) => (
-                              <button
-                                aria-label={`Nastavit ${color} pre ${capture.face} bod ${index + 1}`}
-                                className={selected === color ? `swatch ${color} active` : `swatch ${color}`}
-                                key={color}
-                                onClick={() => setStickerColor(capture.face, index as 0 | 1 | 2, color)}
-                                type="button"
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-            </div>
-            <button className="button" onClick={confirmInspection} type="button">
-              Overit foto inspekciu
-            </button>
-            <div className={validation.ok ? "solution-box" : "inspection-warning"}>
-              <span>{validation.ok ? "Pripravene" : "Chyba podklad"}</span>
-              <p>{validation.messageSk}</p>
-              {!validation.ok ? (
-                <p>
-                  Chybaju strany: {validation.missingFaces.length ? validation.missingFaces.join(", ") : "ziadne"}.
-                  Neoznacene body: {validation.missingStickers}.
-                </p>
-              ) : null}
-            </div>
-            <div className="ai-guide">
-              <div>
-                <span>AI</span>
-                <h3>{guide.title}</h3>
-                <p>{guide.summary}</p>
-              </div>
-              <ol className="guide-steps">
-                {guide.nextActions.map((action, index) => (
-                  <li key={action}>
-                    <span>{index + 1}</span>
-                    <p>{action}</p>
-                  </li>
-                ))}
-              </ol>
-              <div className="ai-boundaries">
-                {guide.aiBoundaries.map((boundary) => (
-                  <p key={boundary}>{boundary}</p>
-                ))}
-              </div>
-              <div className="sound-controls">
-                <button className="button secondary" onClick={toggleSound} type="button">
-                  {soundEnabled ? "Vypnut zvuk" : "Zapnut zvuk"}
-                </button>
-                <button className="button secondary" disabled={!soundEnabled} onClick={speakGuide} type="button">
-                  Precitat dalsi krok
-                </button>
-                <button className="button secondary" onClick={stopSpeech} type="button">
-                  Zastavit zvuk
-                </button>
-              </div>
+            <div className="sound-controls">
+              <button className="button secondary" onClick={toggleSound} type="button">
+                {soundEnabled ? "Vypnut zvuk" : "Zapnut zvuk"}
+              </button>
+              <button className="button secondary" disabled={!soundEnabled} onClick={speakGuide} type="button">
+                Precitat dalsi krok
+              </button>
+              <button className="button secondary" onClick={stopSpeech} type="button">
+                Zastavit zvuk
+              </button>
             </div>
           </div>
+
+          <details className="advanced-inspection">
+            <summary>Pokrocile: rucne overit farby</summary>
+            <div className="inspection-panel">
+              <div className="state-summary">
+                <span>Aktivny subor</span>
+                <strong>{activeMediaName || "ziadny"}</strong>
+              </div>
+              <div className="face-tabs" aria-label="Strany Pyraminxu">
+                {pyraminxFaceIds.map((face) => (
+                  <button
+                    className={activeFace === face ? "face-tab active" : "face-tab"}
+                    key={face}
+                    onClick={() => assignMediaToFace(face)}
+                    type="button"
+                  >
+                    {face}
+                  </button>
+                ))}
+              </div>
+              <div className="sticker-board">
+                {draft.captures
+                  .filter((capture) => capture.face === activeFace)
+                  .map((capture) => (
+                    <div key={capture.face}>
+                      <p className="muted">
+                        Strana {capture.face}: {capture.mediaName || "bez priradenej fotky"}
+                      </p>
+                      <div className="sticker-grid">
+                        {capture.colors.map((selected, index) => (
+                          <div className="sticker-cell" key={`${capture.face}-${index}`}>
+                            <span>bod {index + 1}</span>
+                            <div className="swatch-row">
+                              {stickerColorIds.map((color) => (
+                                <button
+                                  aria-label={`Nastavit ${color} pre ${capture.face} bod ${index + 1}`}
+                                  className={selected === color ? `swatch ${color} active` : `swatch ${color}`}
+                                  key={color}
+                                  onClick={() => setStickerColor(capture.face, index as 0 | 1 | 2, color)}
+                                  type="button"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              <button className="button" onClick={confirmInspection} type="button">
+                Overit foto inspekciu
+              </button>
+              <div className={validation.ok ? "solution-box" : "inspection-warning"}>
+                <span>{validation.ok ? "Pripravene" : "Chyba podklad"}</span>
+                <p>{validation.messageSk}</p>
+                {!validation.ok ? (
+                  <p>
+                    Chybaju strany: {validation.missingFaces.length ? validation.missingFaces.join(", ") : "ziadne"}.
+                    Neoznacene body: {validation.missingStickers}.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </details>
         </div>
       ) : null}
       {status ? <p className="form-status">{status}</p> : null}
       <div className="suggestion-list">
-        <strong>Dalsie kroky pre video</strong>
-        <p>1. Vybrat 4-8 ostrych snimok z videa.</p>
-        <p>2. Pouzivatel potvrdi farby na kazdej strane.</p>
-        <p>3. Validator vytvori stav a solver ho overi simulaciou.</p>
+        <strong>Ak video nepomoze</strong>
+        <p>Natoc ho este raz pomalsie.</p>
+        <p>Na kazdej strane zastav aspon na dve sekundy.</p>
+        <p>Ihlan drz v strede obrazu a bez prudkeho pohybu.</p>
       </div>
     </div>
   );
