@@ -6,6 +6,7 @@ import { deterministicScramble } from "@/lib/domain/pyraminx/fixtures";
 import {
   assignCaptureMedia,
   createEmptyInspectionDraft,
+  createInspectionGuide,
   pyraminxFaceIds,
   setCaptureStickerColor,
   stickerColorIds,
@@ -162,6 +163,7 @@ export function PhotoUploadPanel() {
   const [draft, setDraft] = useState<InspectionDraft>(() => createEmptyInspectionDraft());
   const [status, setStatus] = useState("");
   const validation = validateInspectionDraft(draft);
+  const guide = createInspectionGuide(draft);
 
   useEffect(() => {
     return () => {
@@ -219,6 +221,20 @@ export function PhotoUploadPanel() {
         ? `Dopln priradenie fotky pre strany: ${result.missingFaces.join(", ")}.`
         : `Dopln este ${result.missingStickers} kontrolnych farieb.`
     );
+  }
+
+  function speakGuide() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setStatus("Hlasove citanie nie je v tomto prehliadaci dostupne.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(guide.spokenText);
+    utterance.lang = "sk-SK";
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
+    setStatus("Citam dalsi krok nahlas.");
   }
 
   return (
@@ -313,6 +329,26 @@ export function PhotoUploadPanel() {
                   Neoznacene body: {validation.missingStickers}.
                 </p>
               ) : null}
+            </div>
+            <div className="ai-guide">
+              <div>
+                <span>AI</span>
+                <h3>{guide.title}</h3>
+                <p>{guide.summary}</p>
+              </div>
+              <ol>
+                {guide.nextActions.map((action) => (
+                  <li key={action}>{action}</li>
+                ))}
+              </ol>
+              <div className="ai-boundaries">
+                {guide.aiBoundaries.map((boundary) => (
+                  <p key={boundary}>{boundary}</p>
+                ))}
+              </div>
+              <button className="button secondary" onClick={speakGuide} type="button">
+                Precitat dalsi krok nahlas
+              </button>
             </div>
           </div>
         </div>

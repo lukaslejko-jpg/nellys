@@ -4,6 +4,7 @@ import { deterministicScramble } from "../../src/lib/domain/pyraminx/fixtures.ts
 import {
   assignCaptureMedia,
   createEmptyInspectionDraft,
+  createInspectionGuide,
   setCaptureStickerColor,
   validateInspectionDraft
 } from "../../src/lib/domain/pyraminx/media-inspection.ts";
@@ -108,6 +109,22 @@ test("media inspection reports missing media separately from selected colors", (
   assert.equal(validation.ok, false);
   assert.deepEqual(validation.ok ? [] : validation.missingFaces, ["U"]);
   assert.equal(validation.ok ? -1 : validation.missingStickers, 0);
+});
+
+test("media inspection guide explains next steps without generating moves", () => {
+  let draft = createEmptyInspectionDraft();
+  for (const face of ["U", "L", "R", "B"] as const) {
+    draft = assignCaptureMedia(draft, face, `${face}.jpg`);
+    draft = setCaptureStickerColor(draft, face, 0, "red");
+    draft = setCaptureStickerColor(draft, face, 1, "green");
+    draft = setCaptureStickerColor(draft, face, 2, "blue");
+  }
+
+  const guide = createInspectionGuide(draft);
+
+  assert.match(guide.title, /AI sprievodca/);
+  assert.equal(guide.nextActions.some((action) => action.includes("Vypocitat riesenie")), true);
+  assert.equal(guide.aiBoundaries.some((boundary) => boundary.includes("nevymysla tahy")), true);
 });
 
 test("solver returns verified solutions for deterministic short scrambles", () => {
