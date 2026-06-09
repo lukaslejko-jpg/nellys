@@ -8,5 +8,6 @@ export type CreateUserInput = {
 
 export interface AuthUserRepository {
   createUser(input: CreateUserInput): Promise<AuthUser>;
+  findById(userId: string): Promise<AuthUser | null>;
   findByEmail(email: string): Promise<AuthUser | null>;
 }

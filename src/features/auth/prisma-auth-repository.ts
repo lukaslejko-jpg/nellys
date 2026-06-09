@@ -27,6 +27,14 @@ export class PrismaAuthUserRepository implements AuthUserRepository {
     return toAuthUser(record);
   }
 
+  async findById(userId: string): Promise<AuthUser | null> {
+    const record = await this.prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    return record ? toAuthUser(record) : null;
+  }
+
   async findByEmail(email: string): Promise<AuthUser | null> {
     const record = await this.prisma.user.findUnique({
       where: { email: normalizeEmail(email) }

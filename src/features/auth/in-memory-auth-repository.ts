@@ -3,6 +3,7 @@ import type { AuthUserRepository, CreateUserInput } from "./auth-repository.ts";
 
 export class InMemoryAuthUserRepository implements AuthUserRepository {
   private readonly users = new Map<string, AuthUser>();
+  private readonly usersById = new Map<string, AuthUser>();
   private nextId = 1;
 
   async createUser(input: CreateUserInput): Promise<AuthUser> {
@@ -19,7 +20,12 @@ export class InMemoryAuthUserRepository implements AuthUserRepository {
 
     this.nextId += 1;
     this.users.set(normalizedEmail, user);
+    this.usersById.set(user.id, user);
     return user;
+  }
+
+  async findById(userId: string): Promise<AuthUser | null> {
+    return this.usersById.get(userId) ?? null;
   }
 
   async findByEmail(email: string): Promise<AuthUser | null> {

@@ -14,6 +14,10 @@ export type CreateManualSessionRequest = {
   actor: Actor;
 };
 
+export type SaveCorrectedStateBody = {
+  correctedState: PyraminxState;
+};
+
 export type SaveCorrectedStateRequest = {
   actor: Actor;
   correctedState: PyraminxState;
@@ -125,6 +129,20 @@ export const saveCorrectedStateRequestSchema = {
     return {
       success: true,
       data: { actor: actor.data, correctedState: correctedState.data }
+    };
+  }
+};
+
+export const saveCorrectedStateBodySchema = {
+  safeParse(value: unknown): ParseResult<SaveCorrectedStateBody> {
+    if (!isRecord(value)) return issue("", "Request body must be an object.");
+
+    const correctedState = parsePyraminxState(value.correctedState);
+    if (!correctedState.success) return correctedState;
+
+    return {
+      success: true,
+      data: { correctedState: correctedState.data }
     };
   }
 };

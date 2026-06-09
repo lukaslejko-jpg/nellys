@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
-import { solveSessionHandler } from "@/features/puzzle-session/api-handlers";
+import { solveSessionForActorHandler } from "@/features/puzzle-session/api-handlers";
 import { createPuzzleSessionService } from "@/features/puzzle-session/service-factory";
+import { requireActorFromSessionCookie } from "@/lib/server/auth/require-actor";
 
 export async function POST(
   request: Request,
   context: { params: Promise<{ sessionId: string }> }
 ) {
   const { sessionId } = await context.params;
-  const result = await solveSessionHandler(
+  const actor = await requireActorFromSessionCookie();
+  if (!actor.ok) {
+    return NextResponse.json(actor.body, { status: actor.status });
+  }
+
+  const result = await solveSessionForActorHandler(
     createPuzzleSessionService(),
-    sessionId,
-    await request.json()
+    actor.actor,
+    sessionId
   );
 
   return NextResponse.json(result.body, { status: result.status });

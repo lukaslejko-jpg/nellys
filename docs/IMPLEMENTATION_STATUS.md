@@ -77,6 +77,11 @@
   - in-memory and Prisma session repositories,
   - session create/verify/revoke service,
   - login route HTTP-only cookie metadata.
+- Secured puzzle-session API actor source:
+  - session cookie actor resolver,
+  - user lookup by session token,
+  - puzzle-session routes now derive actor server-side,
+  - secure handler tests prove request body actor is ignored.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
@@ -87,7 +92,7 @@ Passed locally in Codex:
 node --test --experimental-strip-types tests/unit/*.test.ts
 ```
 
-Latest result: 33 tests passed.
+Latest result: 38 tests passed.
 
 Not run in the Codex environment:
 
