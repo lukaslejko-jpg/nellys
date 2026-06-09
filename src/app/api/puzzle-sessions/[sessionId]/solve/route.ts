@@ -7,6 +7,8 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ sessionId: string }> }
 ) {
+  void request;
+
   const { sessionId } = await context.params;
   const actor = await requireActorFromSessionCookie();
   if (!actor.ok) {
