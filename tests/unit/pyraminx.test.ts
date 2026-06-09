@@ -122,7 +122,7 @@ test("media inspection guide explains next steps without generating moves", () =
 
   const guide = createInspectionGuide(draft);
 
-  assert.match(guide.title, /AI sprievodca/);
+  assert.match(guide.title, /Dalsi krok/);
   assert.equal(guide.nextActions.some((action) => action.includes("Vypocitat riesenie")), true);
   assert.equal(guide.aiBoundaries.some((boundary) => boundary.includes("nevymysla tahy")), true);
 });
