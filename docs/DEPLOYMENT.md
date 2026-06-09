@@ -54,7 +54,7 @@ Minimum environment variables for the current Phase 1 deployment:
 ```text
 DATABASE_URL
 NEXTAUTH_SECRET
-NEXTAUTH_URL
+NEXTAUTH_URL=https://nellys-one.vercel.app
 ```
 
 Reserved environment variables for later phases:

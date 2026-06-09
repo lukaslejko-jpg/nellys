@@ -19,7 +19,8 @@ export default function HomePage() {
             ale kazdy tah vypocita a overi deterministicky solver.
           </p>
           <div className="nav">
-            <Link className="button" href="/auth/register">Zacat manualnym zadanim</Link>
+            <Link className="button" href="/auth/register">Vytvorit ucet</Link>
+            <Link className="button secondary" href="/auth/login">Prihlasit sa</Link>
             <Link className="button secondary" href="/admin">Sprava</Link>
           </div>
         </div>
