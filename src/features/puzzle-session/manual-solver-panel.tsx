@@ -160,8 +160,10 @@ export function PhotoUploadPanel() {
   const [media, setMedia] = useState<{ name: string; url: string; type: "image" | "video" }[]>([]);
   const [activeMediaName, setActiveMediaName] = useState("");
   const [activeFace, setActiveFace] = useState<PyraminxFaceId>("U");
+  const [captureMode, setCaptureMode] = useState<"photos" | "video">("photos");
   const [draft, setDraft] = useState<InspectionDraft>(() => createEmptyInspectionDraft());
   const [status, setStatus] = useState("");
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const validation = validateInspectionDraft(draft);
   const guide = createInspectionGuide(draft);
 
@@ -224,6 +226,11 @@ export function PhotoUploadPanel() {
   }
 
   function speakGuide() {
+    if (!soundEnabled) {
+      setStatus("Zvuk je vypnuty. Najprv zapni zvuk AI sprievodcu.");
+      return;
+    }
+
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       setStatus("Hlasove citanie nie je v tomto prehliadaci dostupne.");
       return;
@@ -237,16 +244,67 @@ export function PhotoUploadPanel() {
     setStatus("Citam dalsi krok nahlas.");
   }
 
+  function toggleSound() {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    if (!next && typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setStatus(next ? "Zvuk AI sprievodcu je zapnuty." : "Zvuk AI sprievodcu je vypnuty.");
+  }
+
+  function stopSpeech() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setStatus("Hlasove citanie je zastavene.");
+  }
+
   return (
     <div className="manual-solver">
       <div>
-        <h2>Foto / video upload</h2>
+        <h2>1. Nahraj Pyraminx</h2>
         <p className="muted">
-          Nahraj fotky alebo kratke video a pouzi ich ako podklad na potvrdenie farieb. Tahy sa z media negeneruju.
+          Nellys teraz riesi ihlan Pyraminx. Klasicka Rubikova kocka bude samostatny model,
+          preto zatial fot alebo toc iba Pyraminx.
         </p>
       </div>
+      <div className="capture-mode" aria-label="Rezim nahratia">
+        <button
+          className={captureMode === "photos" ? "face-tab active" : "face-tab"}
+          onClick={() => setCaptureMode("photos")}
+          type="button"
+        >
+          Fotky
+        </button>
+        <button
+          className={captureMode === "video" ? "face-tab active" : "face-tab"}
+          onClick={() => setCaptureMode("video")}
+          type="button"
+        >
+          Video
+        </button>
+      </div>
+      <div className="capture-guide">
+        <strong>{captureMode === "photos" ? "Ako nafotit ihlan" : "Ako natocit video"}</strong>
+        {captureMode === "photos" ? (
+          <ol>
+            <li>Poloz Pyraminx na dobre svetlo bez odleskov.</li>
+            <li>Odfot postupne styri strany: U, L, R, B.</li>
+            <li>Kazda fotka ma ukazat jednu celu farebnu stranu a hrany okolo nej.</li>
+            <li>Ak si nie si isty stranou, nahraj viac fotiek. Potom ich priradis nizsie.</li>
+          </ol>
+        ) : (
+          <ol>
+            <li>Natoc pomale video okolo celeho Pyraminxu.</li>
+            <li>Na kazdej strane sa zastav aspon na dve sekundy.</li>
+            <li>Drz hlavolam v strede zaberu, bez rychleho trasenia.</li>
+            <li>Po nahrati vyber ostre snimky a potvrdis farby rucne.</li>
+          </ol>
+        )}
+      </div>
       <label className="upload-box">
-        <span>Vybrat fotky alebo video</span>
+        <span>{captureMode === "photos" ? "Vybrat fotky Pyraminxu" : "Vybrat video Pyraminxu"}</span>
         <input accept="image/*,video/*,.qt,.mov,.mp4" multiple onChange={handleMedia} type="file" />
       </label>
       {media.length > 0 ? (
@@ -346,9 +404,17 @@ export function PhotoUploadPanel() {
                   <p key={boundary}>{boundary}</p>
                 ))}
               </div>
-              <button className="button secondary" onClick={speakGuide} type="button">
-                Precitat dalsi krok nahlas
-              </button>
+              <div className="sound-controls">
+                <button className="button secondary" onClick={toggleSound} type="button">
+                  {soundEnabled ? "Vypnut zvuk" : "Zapnut zvuk"}
+                </button>
+                <button className="button secondary" disabled={!soundEnabled} onClick={speakGuide} type="button">
+                  Precitat dalsi krok
+                </button>
+                <button className="button secondary" onClick={stopSpeech} type="button">
+                  Zastavit zvuk
+                </button>
+              </div>
             </div>
           </div>
         </div>

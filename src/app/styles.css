@@ -488,6 +488,36 @@ h2 {
   display: none;
 }
 
+.capture-mode {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.capture-guide {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.capture-guide strong {
+  font-size: 18px;
+}
+
+.capture-guide ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.capture-guide li {
+  line-height: 1.4;
+}
+
 .photo-grid {
   display: grid;
   gap: 10px;
@@ -713,6 +743,16 @@ h2 {
   font-size: 13px;
 }
 
+.sound-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sound-controls .button {
+  width: 100%;
+}
+
 .suggestion-list {
   background: #fff7ed;
   border: 1px solid #fed7aa;
@@ -789,8 +829,10 @@ pre {
 
   .status-grid,
   .three-actions,
+  .capture-mode,
   .photo-grid,
-  .sticker-grid {
+  .sticker-grid,
+  .sound-controls {
     grid-template-columns: 1fr;
   }
 

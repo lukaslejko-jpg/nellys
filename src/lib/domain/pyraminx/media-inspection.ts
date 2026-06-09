@@ -119,16 +119,17 @@ export function createInspectionGuide(draft: InspectionDraft): InspectionGuide {
       title: "AI sprievodca caka na kompletne podklady",
       summary: missing,
       nextActions: [
-        "Vyber aktivnu fotku.",
-        "Klikni stranu U, L, R alebo B, ktorej fotka patri.",
-        "Oznac tri kontrolne farby pre kazdu stranu."
+        "Ak mas Pyraminx v ruke, odfot alebo natoc styri hlavne strany: U, L, R a B.",
+        "Vyber aktivnu fotku a klikni stranu, ktorej fotka patri.",
+        "Oznac tri kontrolne farby pre kazdu stranu.",
+        "Ak mas klasicku Rubikovu kocku, tento model ju zatial nevyriesi. Tento tok je pre ihlan Pyraminx."
       ],
       aiBoundaries: [
         "AI moze vysvetlit, co chyba.",
         "AI nesmie doplnit farby ani tahy za teba.",
         "Solver sa spusti az nad deterministicky overenym stavom."
       ],
-      spokenText: `Inspekcia este nie je kompletna. ${missing} Najprv dopln fotku alebo farby.`
+      spokenText: `Inspekcia este nie je kompletna. ${missing} Nafot alebo natoc styri strany ihlanu Pyraminx, potom prirad fotky ku stranam a oznac farby.`
     };
   }
 
@@ -138,6 +139,7 @@ export function createInspectionGuide(draft: InspectionDraft): InspectionGuide {
     title: "AI sprievodca: co spravit dalej",
     summary,
     nextActions: [
+      "Teraz z fotiek este nemam hotovy vypocitatelny stav. Fotky sluzia ako kontrola farieb a orientacie.",
       "Ak poznas scramble, vloz ho do pola Scramble zapis a klikni Pouzit scramble.",
       "Ak scramble nepoznas, v manualnom solveri postupne naklikaj legalne tahy tak, aby stav zodpovedal hlavolamu.",
       "Potom klikni Vypocitat riesenie. Tahy vypocita a overi iba deterministicky solver.",
@@ -149,7 +151,7 @@ export function createInspectionGuide(draft: InspectionDraft): InspectionGuide {
       "Foto inspekcia je podklad pre dalsi validator, nie hotove riesenie."
     ],
     spokenText:
-      "Inspekcia je kompletna. Teraz mas dve moznosti. Ak poznas scramble, vloz ho do scramble pola a pouzi solver. Ak scramble nepoznas, naklikaj stav manualnymi tahmi. Riesenie smie vypocitat iba deterministicky solver."
+      "Inspekcia je kompletna. Fotky su kontrolny podklad, nie hotove riesenie. Teraz mas dve moznosti. Ak poznas scramble, vloz ho do scramble pola a pouzi solver. Ak scramble nepoznas, naklikaj stav manualnymi tahmi. Riesenie smie vypocitat iba deterministicky solver."
   };
 }
 

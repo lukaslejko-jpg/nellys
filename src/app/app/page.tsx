@@ -14,8 +14,8 @@ export default function AppDashboardPage() {
           <p className="eyebrow">Nellys workspace</p>
           <h1>Nellys aplikacia</h1>
           <p className="muted">
-            Manualny tok, scramble solver a foto/video nahlad. AI rozpoznavanie
-            ostava vypnute, kym nebude validovane.
+            Najprv nahraj fotky alebo video ihlanu Pyraminx. AI ta navedie,
+            co nafotit a co spravit dalej; tahy stale pocita iba solver.
           </p>
         </div>
         <SessionSummary />
@@ -23,28 +23,28 @@ export default function AppDashboardPage() {
 
       <section className="status-grid" aria-label="Stav systemu">
         <div className="status-card">
-          <span>Solver</span>
+          <span>1. Podklady</span>
+          <strong>Foto / video</strong>
+          <small>Nellys ta navedie, ako nafotit kazdu stranu ihlanu.</small>
+        </div>
+        <div className="status-card">
+          <span>2. Stav</span>
+          <strong>Potvrdenie</strong>
+          <small>Farby potvrdis ty, AI iba vysvetluje a kontroluje tok.</small>
+        </div>
+        <div className="status-card">
+          <span>3. Solver</span>
           <strong>{solution.ok ? "Pripraveny" : "Chyba"}</strong>
-          <small>{solution.ok ? "Solved state: ziadne tahy" : solution.error}</small>
-        </div>
-        <div className="status-card">
-          <span>Vstup</span>
-          <strong>Manual + media</strong>
-          <small>Foto/video zatial iba ako nahlad.</small>
-        </div>
-        <div className="status-card">
-          <span>Bezpecnost</span>
-          <strong>Bez AI tahov</strong>
-          <small>Riesenie generuje simulator a solver.</small>
+          <small>{solution.ok ? "Riesenie generuje simulator a solver." : solution.error}</small>
         </div>
       </section>
 
       <section className="workspace-grid">
         <div className="panel feature-panel">
-          <ManualSolverPanel />
+          <PhotoUploadPanel />
         </div>
         <div className="panel feature-panel">
-          <PhotoUploadPanel />
+          <ManualSolverPanel />
         </div>
       </section>
 
