@@ -1,5 +1,6 @@
 import type { AuthService } from "./auth-service.ts";
 import { loginRequestSchema, registerRequestSchema } from "./api-contracts.ts";
+import type { SessionActorResolver } from "./session-actor-resolver.ts";
 import type { UserSessionService } from "./session-service.ts";
 
 export type AuthApiHandlerResult = {
@@ -54,6 +55,35 @@ export async function loginHandler(
       name: "nellys_session",
       value: token.token,
       maxAgeSeconds: 60 * 60 * 24 * 30
+    }
+  };
+}
+
+export async function currentUserHandler(
+  resolver: SessionActorResolver,
+  token: string | undefined | null
+): Promise<AuthApiHandlerResult> {
+  const resolved = await resolver.resolve(token);
+  return resolved.ok
+    ? { status: 200, body: { ok: true, user: resolved.user } }
+    : { status: 401, body: { ok: false, code: resolved.code } };
+}
+
+export async function logoutHandler(
+  sessions: UserSessionService,
+  token: string | undefined | null
+): Promise<AuthApiHandlerResult> {
+  if (token) {
+    await sessions.revoke(token);
+  }
+
+  return {
+    status: 200,
+    body: { ok: true },
+    cookie: {
+      name: "nellys_session",
+      value: "",
+      maxAgeSeconds: 0
     }
   };
 }

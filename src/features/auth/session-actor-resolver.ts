@@ -1,9 +1,11 @@
 import type { Actor } from "../../lib/server/auth/authorization.ts";
 import type { AuthUserRepository } from "./auth-repository.ts";
 import type { UserSessionService } from "./session-service.ts";
+import type { PublicAuthUser } from "./auth-types.ts";
+import { toPublicAuthUser } from "./auth-types.ts";
 
 export type ActorResolutionResult =
-  | { ok: true; actor: Actor }
+  | { ok: true; actor: Actor; user: PublicAuthUser }
   | { ok: false; code: "SESSION_MISSING" | "SESSION_INVALID" | "USER_NOT_ACTIVE" };
 
 export class SessionActorResolver {
@@ -35,7 +37,8 @@ export class SessionActorResolver {
       actor: {
         id: user.id,
         role: user.role
-      }
+      },
+      user: toPublicAuthUser(user)
     };
   }
 }

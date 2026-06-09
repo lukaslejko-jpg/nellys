@@ -2,7 +2,9 @@
 
 ## Completed in this pass
 
-- Created architecture plan locally in `docs/NELLYS_ARCHITECTURE_PLAN.md`.
+- Imported the DOCX specification into `docs/`.
+- Extracted the DOCX text for review.
+- Created architecture plan in `docs/NELLYS_ARCHITECTURE_PLAN.md`.
 - Recorded approved decisions:
   - Next.js + Prisma + PostgreSQL + Auth.js.
   - UI name `Nellys`.
@@ -82,19 +84,23 @@
   - user lookup by session token,
   - puzzle-session routes now derive actor server-side,
   - secure handler tests prove request body actor is ignored.
+- Added current-user and logout session endpoints:
+  - `GET /api/auth/me` resolves the logged-in user from the HTTP-only session cookie,
+  - `POST /api/auth/logout` revokes the stored session token and clears the cookie,
+  - handler tests cover valid current-user lookup, missing sessions and logout revocation.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification
 
-Passed locally in Codex:
+Passed:
 
 ```text
 node --test --experimental-strip-types tests/unit/*.test.ts
 ```
 
-Latest result: 38 tests passed.
+Latest result: 41 tests passed.
 
-Not run in the Codex environment:
+Not run in this environment:
 
 - `npm install`
 - `npm run lint`
@@ -102,7 +108,7 @@ Not run in the Codex environment:
 - `npm run test:e2e`
 - `npm run build`
 
-Reason: `npm` is not available in PATH in this Codex environment. A bundled Node runtime was used for domain tests.
+Reason: `npm` is not available in PATH in this Codex environment. A bundled Node runtime is available and was used for domain tests.
 
 ## Important limitation
 
