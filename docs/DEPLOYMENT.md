@@ -40,12 +40,17 @@ Build settings:
 - Install command: `npm install`
 - Output directory: default
 
-Required environment variables:
+Minimum environment variables for the current Phase 1 deployment:
 
 ```text
 DATABASE_URL
 NEXTAUTH_SECRET
 NEXTAUTH_URL
+```
+
+Reserved environment variables for later phases:
+
+```text
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 OPENAI_API_KEY
