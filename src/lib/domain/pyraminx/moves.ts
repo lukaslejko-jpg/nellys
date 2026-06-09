@@ -36,6 +36,24 @@ export function inverseSequence(moves: readonly PyraminxMove[]): PyraminxMove[] 
   return [...moves].reverse().map(inverseMove);
 }
 
+export type ParseMoveSequenceResult =
+  | { ok: true; moves: PyraminxMove[] }
+  | { ok: false; invalidTokens: string[] };
+
+export function parseMoveSequence(input: string): ParseMoveSequenceResult {
+  const tokens = input
+    .trim()
+    .split(/[\s,]+/)
+    .filter(Boolean);
+  const invalidTokens = tokens.filter((token) => !isLegalMove(token));
+
+  if (invalidTokens.length > 0) {
+    return { ok: false, invalidTokens };
+  }
+
+  return { ok: true, moves: tokens as PyraminxMove[] };
+}
+
 export function baseFace(move: PyraminxMove): MoveFace {
   return (move.endsWith("'") ? move.slice(0, -1) : move) as MoveFace;
 }

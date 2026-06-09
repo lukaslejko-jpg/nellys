@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { deterministicScramble } from "../../src/lib/domain/pyraminx/fixtures.ts";
-import { inverseMove, inverseSequence, legalMoves } from "../../src/lib/domain/pyraminx/moves.ts";
+import { inverseMove, inverseSequence, legalMoves, parseMoveSequence } from "../../src/lib/domain/pyraminx/moves.ts";
 import { solveState, verifySolution } from "../../src/lib/domain/pyraminx/solver.ts";
 import { applyMove, applySequence } from "../../src/lib/domain/pyraminx/simulator.ts";
 import { createSolvedState, isSolved, serializeState } from "../../src/lib/domain/pyraminx/state.ts";
@@ -34,6 +34,20 @@ test("inverse sequence returns a scramble to solved state", () => {
   const restored = applySequence(scrambled, inverseSequence(scramble));
 
   assert.equal(isSolved(restored), true);
+});
+
+test("move sequence parser accepts whitespace and comma separated legal moves", () => {
+  const parsed = parseMoveSequence("U R', L b'");
+
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.ok ? parsed.moves : [], ["U", "R'", "L", "b'"]);
+});
+
+test("move sequence parser rejects illegal tokens", () => {
+  const parsed = parseMoveSequence("U X R2");
+
+  assert.equal(parsed.ok, false);
+  assert.deepEqual(parsed.ok ? [] : parsed.invalidTokens, ["X", "R2"]);
 });
 
 test("solver returns verified solutions for deterministic short scrambles", () => {

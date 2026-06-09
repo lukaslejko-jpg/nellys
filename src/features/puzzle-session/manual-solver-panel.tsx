@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { deterministicScramble } from "@/lib/domain/pyraminx/fixtures";
-import { legalMoves, type PyraminxMove } from "@/lib/domain/pyraminx/moves";
+import { inverseSequence, legalMoves, parseMoveSequence, type PyraminxMove } from "@/lib/domain/pyraminx/moves";
 import { applyMove, applySequence } from "@/lib/domain/pyraminx/simulator";
 import type { PyraminxState } from "@/lib/domain/pyraminx/state";
 import { createSolvedState, isSolved, serializeState } from "@/lib/domain/pyraminx/state";
@@ -15,6 +15,7 @@ type ApiResult =
 export function ManualSolverPanel() {
   const [state, setState] = useState<PyraminxState>(() => createSolvedState());
   const [inputMoves, setInputMoves] = useState<PyraminxMove[]>([]);
+  const [scrambleText, setScrambleText] = useState("");
   const [status, setStatus] = useState("");
   const [moves, setMoves] = useState<string[] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,6 +31,7 @@ export function ManualSolverPanel() {
   function applyDemoScramble() {
     setState(applySequence(createSolvedState(), demoScramble));
     setInputMoves(demoScramble);
+    setScrambleText(demoScramble.join(" "));
     setMoves(null);
     setStatus("Demo scramble bol vytvoreny deterministickym simulatorom.");
   }
@@ -37,8 +39,23 @@ export function ManualSolverPanel() {
   function resetState() {
     setState(createSolvedState());
     setInputMoves([]);
+    setScrambleText("");
     setMoves(null);
     setStatus("Stav bol resetovany na vyrieseny Pyraminx.");
+  }
+
+  function applyScrambleText() {
+    const parsed = parseMoveSequence(scrambleText);
+    if (!parsed.ok) {
+      setStatus(`Neplatne tahy: ${parsed.invalidTokens.join(", ")}`);
+      setMoves(null);
+      return;
+    }
+
+    setState(applySequence(createSolvedState(), parsed.moves));
+    setInputMoves(parsed.moves);
+    setMoves(inverseSequence(parsed.moves));
+    setStatus("Scramble bol odsimulovany. Inverzne riesenie je vypocitane deterministicky.");
   }
 
   async function runSolverFlow() {
@@ -82,7 +99,19 @@ export function ManualSolverPanel() {
           </button>
         ))}
       </div>
-      <div className="solver-actions">
+      <label className="field compact-field">
+        <span>Scramble zapis</span>
+        <textarea
+          onChange={(event) => setScrambleText(event.target.value)}
+          placeholder="napr. U R' L B"
+          rows={2}
+          value={scrambleText}
+        />
+      </label>
+      <div className="solver-actions three-actions">
+        <button className="button secondary" onClick={applyScrambleText} type="button">
+          Pouzit scramble
+        </button>
         <button className="button secondary" onClick={applyDemoScramble} type="button">
           Demo scramble
         </button>
@@ -102,7 +131,10 @@ export function ManualSolverPanel() {
       </button>
       {status ? <p className="form-status">{status}</p> : null}
       {moves ? (
-        <p className="muted">Vypocitane tahy: {moves.length > 0 ? moves.join(" ") : "ziadne tahy"}</p>
+        <div className="solution-box">
+          <span>Riesenie</span>
+          <strong>{moves.length > 0 ? moves.join(" ") : "ziadne tahy"}</strong>
+        </div>
       ) : null}
       <details>
         <summary>Manualny vstup pre tento krok</summary>
