@@ -697,7 +697,7 @@ h2 {
   padding: 14px;
 }
 
-.ai-guide span {
+.ai-guide > div > span {
   background: var(--blue);
   border-radius: 8px;
   color: #ffffff;
@@ -718,15 +718,45 @@ h2 {
   margin: 0;
 }
 
-.ai-guide ol {
+.guide-steps {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  list-style: none;
   margin: 0;
-  padding-left: 22px;
+  padding: 0;
 }
 
-.ai-guide li {
-  line-height: 1.4;
+.guide-steps li {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #c7dbff;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 34px 1fr;
+  line-height: 1.35;
+  padding: 10px;
+}
+
+.guide-steps span {
+  align-items: center;
+  aspect-ratio: 1;
+  background: #173b77;
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 15px;
+  font-weight: 800;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+}
+
+.guide-steps p {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
 }
 
 .ai-boundaries {
@@ -740,7 +770,7 @@ h2 {
 
 .ai-boundaries p {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .sound-controls {
