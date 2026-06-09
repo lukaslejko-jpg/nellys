@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { deterministicScramble } from "@/lib/domain/pyraminx/fixtures";
 import {
+  assignCaptureMedia,
   createEmptyInspectionDraft,
   pyraminxFaceIds,
+  setCaptureStickerColor,
   stickerColorIds,
   validateInspectionDraft,
   type InspectionDraft,
@@ -178,10 +180,14 @@ export function PhotoUploadPanel() {
     media.forEach((item) => URL.revokeObjectURL(item.url));
     setMedia(nextMedia);
     setActiveMediaName(nextMedia[0]?.name ?? "");
-    setDraft(createEmptyInspectionDraft());
+    setDraft(
+      nextMedia[0]
+        ? assignCaptureMedia(createEmptyInspectionDraft(), "U", nextMedia[0].name)
+        : createEmptyInspectionDraft()
+    );
     setStatus(
       files.length > 0
-        ? "Subory su pripravene. Vyber stranu Pyraminxu a oznac tri kontrolne farby podla fotky."
+        ? "Prvy subor som priradil strane U. Ak patri inej strane, vyber fotku a klikni spravnu stranu."
         : ""
     );
   }
@@ -193,28 +199,26 @@ export function PhotoUploadPanel() {
     }
 
     setActiveFace(face);
-    setDraft((current) => ({
-      captures: current.captures.map((capture) =>
-        capture.face === face ? { ...capture, mediaName: activeMediaName } : capture
-      )
-    }));
+    setDraft((current) => assignCaptureMedia(current, face, activeMediaName));
     setStatus(`Strana ${face} je priradena k suboru ${activeMediaName}. Teraz oznac tri farby.`);
   }
 
   function setStickerColor(face: PyraminxFaceId, index: 0 | 1 | 2, color: StickerColorId) {
-    setDraft((current) => ({
-      captures: current.captures.map((capture) => {
-        if (capture.face !== face) return capture;
-        const colors = [...capture.colors] as typeof capture.colors;
-        colors[index] = color;
-        return { ...capture, colors };
-      })
-    }));
+    setDraft((current) => setCaptureStickerColor(current, face, index, color, activeMediaName));
   }
 
   function confirmInspection() {
     const result = validateInspectionDraft(draft);
-    setStatus(result.messageSk);
+    if (result.ok) {
+      setStatus(result.messageSk);
+      return;
+    }
+
+    setStatus(
+      result.missingFaces.length > 0
+        ? `Dopln priradenie fotky pre strany: ${result.missingFaces.join(", ")}.`
+        : `Dopln este ${result.missingStickers} kontrolnych farieb.`
+    );
   }
 
   return (

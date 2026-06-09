@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { deterministicScramble } from "../../src/lib/domain/pyraminx/fixtures.ts";
-import { createEmptyInspectionDraft, validateInspectionDraft } from "../../src/lib/domain/pyraminx/media-inspection.ts";
+import {
+  assignCaptureMedia,
+  createEmptyInspectionDraft,
+  setCaptureStickerColor,
+  validateInspectionDraft
+} from "../../src/lib/domain/pyraminx/media-inspection.ts";
 import { inverseMove, inverseSequence, legalMoves, parseMoveSequence } from "../../src/lib/domain/pyraminx/moves.ts";
 import { solveState, verifySolution } from "../../src/lib/domain/pyraminx/solver.ts";
 import { applyMove, applySequence } from "../../src/lib/domain/pyraminx/simulator.ts";
@@ -73,6 +78,36 @@ test("media inspection draft accepts user confirmed face captures", () => {
 
   assert.equal(validation.ok, true);
   assert.equal(validation.ok ? validation.totalStickers : 0, 12);
+});
+
+test("media inspection can auto-attach active media while setting colors", () => {
+  let draft = createEmptyInspectionDraft();
+  draft = setCaptureStickerColor(draft, "U", 0, "red", "u.jpg");
+  draft = setCaptureStickerColor(draft, "U", 1, "green", "u.jpg");
+  draft = setCaptureStickerColor(draft, "U", 2, "blue", "u.jpg");
+
+  const capture = draft.captures.find((item) => item.face === "U");
+
+  assert.equal(capture?.mediaName, "u.jpg");
+  assert.deepEqual(capture?.colors, ["red", "green", "blue"]);
+});
+
+test("media inspection reports missing media separately from selected colors", () => {
+  let draft = createEmptyInspectionDraft();
+  for (const face of ["L", "R", "B"] as const) {
+    draft = assignCaptureMedia(draft, face, `${face}.jpg`);
+  }
+  for (const face of ["U", "L", "R", "B"] as const) {
+    draft = setCaptureStickerColor(draft, face, 0, "red");
+    draft = setCaptureStickerColor(draft, face, 1, "green");
+    draft = setCaptureStickerColor(draft, face, 2, "blue");
+  }
+
+  const validation = validateInspectionDraft(draft);
+
+  assert.equal(validation.ok, false);
+  assert.deepEqual(validation.ok ? [] : validation.missingFaces, ["U"]);
+  assert.equal(validation.ok ? -1 : validation.missingStickers, 0);
 });
 
 test("solver returns verified solutions for deterministic short scrambles", () => {

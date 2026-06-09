@@ -37,6 +37,39 @@ export function createEmptyInspectionDraft(): InspectionDraft {
   };
 }
 
+export function assignCaptureMedia(
+  draft: InspectionDraft,
+  face: PyraminxFaceId,
+  mediaName: string
+): InspectionDraft {
+  return {
+    captures: draft.captures.map((capture) =>
+      capture.face === face ? { ...capture, mediaName } : capture
+    )
+  };
+}
+
+export function setCaptureStickerColor(
+  draft: InspectionDraft,
+  face: PyraminxFaceId,
+  index: 0 | 1 | 2,
+  color: StickerColorId,
+  fallbackMediaName = ""
+): InspectionDraft {
+  return {
+    captures: draft.captures.map((capture) => {
+      if (capture.face !== face) return capture;
+      const colors = [...capture.colors] as FaceCapture["colors"];
+      colors[index] = color;
+      return {
+        ...capture,
+        mediaName: capture.mediaName || fallbackMediaName,
+        colors
+      };
+    })
+  };
+}
+
 export function validateInspectionDraft(draft: InspectionDraft): InspectionValidation {
   const missingFaces = draft.captures
     .filter((capture) => capture.mediaName.trim().length === 0)
@@ -51,8 +84,7 @@ export function validateInspectionDraft(draft: InspectionDraft): InspectionValid
       ok: false,
       missingFaces,
       missingStickers,
-      messageSk:
-        "Inspekcia z fotiek este nie je kompletna. Vyber fotku pre kazdu stranu a oznac tri kontrolne farby."
+      messageSk: buildMissingInspectionMessage(missingFaces, missingStickers)
     };
   }
 
@@ -62,4 +94,16 @@ export function validateInspectionDraft(draft: InspectionDraft): InspectionValid
     messageSk:
       "Inspekcia je kompletna ako pouzivatelsky potvrdeny podklad. Dalsi krok je preklad nalepiek na Pyraminx state."
   };
+}
+
+function buildMissingInspectionMessage(missingFaces: PyraminxFaceId[], missingStickers: number): string {
+  if (missingFaces.length > 0 && missingStickers === 0) {
+    return "Farby su oznacene, ale niektore strany nemaju priradenu fotku. Klikni aktivnu fotku a potom chybajucu stranu.";
+  }
+
+  if (missingFaces.length === 0 && missingStickers > 0) {
+    return "Fotky su priradene. Este oznac vsetky tri kontrolne farby na kazdej strane.";
+  }
+
+  return "Inspekcia z fotiek este nie je kompletna. Vyber fotku pre kazdu stranu a oznac tri kontrolne farby.";
 }
