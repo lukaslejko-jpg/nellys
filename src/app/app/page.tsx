@@ -1,5 +1,6 @@
 import { createSolvedState, serializeState } from "@/lib/domain/pyraminx/state";
 import { solveState } from "@/lib/domain/pyraminx/solver";
+import { SessionSummary } from "@/features/auth/session-summary";
 
 export default function AppDashboardPage() {
   const solved = createSolvedState();
@@ -13,6 +14,7 @@ export default function AppDashboardPage() {
           Faza 1 zaklada manualny tok a solver jadro. Foto a AI rozpoznavanie
           zostavaju feature-flagovane, kym nebudu validovane.
         </p>
+        <SessionSummary />
         <div className="grid">
           <div className="panel">
             <h2>Nove riesenie</h2>
@@ -26,7 +28,7 @@ export default function AppDashboardPage() {
           </div>
           <div className="panel">
             <h2>Stav</h2>
-            <p className="muted">Auth a session API su pripravene. Server-side session je dalsi krok.</p>
+            <p className="muted">Auth, server-side session cookie a zakladne solver API su pripravene.</p>
           </div>
         </div>
         <details>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 type AuthMode = "register" | "login";
@@ -17,6 +18,7 @@ type AuthResponse =
   | { ok: false; code: string; messageSk?: string };
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,8 +47,13 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       return;
     }
 
-    localStorage.setItem("nellys.currentUser", JSON.stringify(body.user));
-    setStatus(mode === "register" ? "Ucet bol vytvoreny." : "Prihlasenie prebehlo uspesne.");
+    if (mode === "login") {
+      router.push("/app");
+      router.refresh();
+      return;
+    }
+
+    setStatus("Ucet bol vytvoreny. Teraz sa mozes prihlasit.");
   }
 
   return (

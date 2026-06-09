@@ -88,6 +88,10 @@
   - `GET /api/auth/me` resolves the logged-in user from the HTTP-only session cookie,
   - `POST /api/auth/logout` revokes the stored session token and clears the cookie,
   - handler tests cover valid current-user lookup, missing sessions and logout revocation.
+- Connected auth UI to server-side sessions:
+  - login redirects to `/app` after the session cookie is issued,
+  - dashboard checks `GET /api/auth/me`,
+  - dashboard exposes logout through `POST /api/auth/logout`.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification

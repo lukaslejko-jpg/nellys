@@ -8,8 +8,8 @@ export default function LoginPage() {
         <p className="eyebrow">Nellys ucet</p>
         <h1>Prihlasenie</h1>
         <p className="muted">
-          Prihlasenie vola auth API. Server-side session cookie este nie je
-          zapnuta, kym nedokoncime Auth.js/session vrstvu.
+          Prihlasenie vytvori server-side session cookie. Puzzle API potom
+          pouzije prihlaseneho pouzivatela zo session, nie z tela requestu.
         </p>
         <AuthForm mode="login" />
         <p className="muted">

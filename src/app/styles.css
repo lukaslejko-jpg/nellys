@@ -178,6 +178,22 @@ a {
   margin-top: 24px;
 }
 
+.auth-banner {
+  align-items: center;
+  background: #eef3f8;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 12px;
+}
+
+.auth-banner p {
+  margin: 0;
+}
+
 details {
   margin-top: 20px;
 }
