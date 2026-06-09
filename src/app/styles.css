@@ -65,9 +65,11 @@ a {
   color: white;
   display: inline-flex;
   font-weight: 700;
+  justify-content: center;
   min-height: 42px;
   padding: 10px 14px;
   text-decoration: none;
+  width: fit-content;
 }
 
 .button.secondary {
@@ -101,6 +103,7 @@ a {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
+  min-width: 0;
   padding: 20px;
 }
 
@@ -124,7 +127,7 @@ a {
 .grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   margin: 32px auto 0;
   max-width: 1120px;
 }
@@ -197,6 +200,11 @@ a {
 .manual-solver {
   display: grid;
   gap: 14px;
+  min-width: 0;
+}
+
+.manual-solver .button {
+  width: 100%;
 }
 
 details {
@@ -211,8 +219,10 @@ summary {
 pre {
   background: #eef3f8;
   border-radius: 8px;
+  max-width: 100%;
   overflow: auto;
   padding: 12px;
+  white-space: pre;
 }
 
 @media (max-width: 760px) {
