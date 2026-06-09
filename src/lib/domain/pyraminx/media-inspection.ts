@@ -35,6 +35,11 @@ export type InspectionGuide = {
   spokenText: string;
 };
 
+export type InspectionGuideContext = {
+  mode?: "photos" | "video";
+  hasMedia?: boolean;
+};
+
 export function createEmptyInspectionDraft(): InspectionDraft {
   return {
     captures: pyraminxFaceIds.map((face) => ({
@@ -104,11 +109,53 @@ export function validateInspectionDraft(draft: InspectionDraft): InspectionValid
   };
 }
 
-export function createInspectionGuide(draft: InspectionDraft): InspectionGuide {
+export function createInspectionGuide(draft: InspectionDraft, context: InspectionGuideContext = {}): InspectionGuide {
   const validation = validateInspectionDraft(draft);
   const confirmedFaces = draft.captures
     .filter((capture) => capture.mediaName.trim().length > 0)
     .map((capture) => capture.face);
+
+  if (context.mode === "video" && context.hasMedia && !validation.ok) {
+    return {
+      title: "Video mam. Teraz ukaz ihlan.",
+      summary: "Drz hlavolam pred kamerou a postupuj pomaly. Nic neklikaj, najprv len ukaz vsetky strany.",
+      nextActions: [
+        "Poloz alebo chyt ihlan spickou hore.",
+        "Ukaz jednu celu farebnu stranu kamere.",
+        "Chvilu stoj. Pocitaj: jeden, dva.",
+        "Pomaly otoc ihlan na dalsiu stranu.",
+        "Takto ukaz vsetky styri strany."
+      ],
+      aiBoundaries: [
+        "Ked je video neostre, natoc ho este raz pomalsie.",
+        "AI teraz radi, ako video natocit.",
+        "Riesenie pride az po overeni stavu solverom."
+      ],
+      spokenText:
+        "Video mam. Chyt ihlan spickou hore. Ukaz jednu celu farebnu stranu kamere. Pocitaj jeden, dva. Potom pomaly otoc ihlan na dalsiu stranu. Takto ukaz vsetky styri strany."
+    };
+  }
+
+  if (context.mode === "photos" && context.hasMedia && !validation.ok) {
+    return {
+      title: "Fotky mam. Teraz skontroluj ihlan.",
+      summary: "Najprv sa len pozri, ci su fotky ostre a je vidno cele farebne strany.",
+      nextActions: [
+        "Najdi na ihlane jednu celu farebnu stranu.",
+        "Porovnaj ju s nahratou fotkou.",
+        "Ak chyba strana, odfot ju este raz.",
+        "Ak je fotka rozmazana, sprav novu.",
+        "Potom prejdi na jednoduche overenie farieb."
+      ],
+      aiBoundaries: [
+        "Tento tok je pre ihlan Pyraminx.",
+        "AI ta vedie krok za krokom.",
+        "Tahy vypocita az solver."
+      ],
+      spokenText:
+        "Fotky mam. Pozri sa, ci su ostre. Najdi jednu celu farebnu stranu na ihlane a porovnaj ju s fotkou. Ak chyba alebo je rozmazana, odfot ju znova."
+    };
+  }
 
   if (!validation.ok) {
     const missing = validation.missingFaces.length
@@ -119,18 +166,18 @@ export function createInspectionGuide(draft: InspectionDraft): InspectionGuide {
       title: "Co spravit teraz",
       summary: missing,
       nextActions: [
-        "Odfot alebo natoc cely ihlan.",
-        "Vyber fotku jednej strany.",
-        "Klikni, ci je to strana U, L, R alebo B.",
-        "Oznac tri farby na tejto strane.",
-        "Zopakuj to pre vsetky styri strany."
+        "Zober ihlan do ruky.",
+        "Ukaz alebo odfot jednu celu stranu.",
+        "Pomaly otoc ihlan na dalsiu stranu.",
+        "Ukaz vsetky styri strany.",
+        "Potom Nellys skontroluje, ci ma dost podkladov."
       ],
       aiBoundaries: [
         "Tento tok je pre ihlan Pyraminx.",
-        "AI ti radi, ale farby potvrdis ty.",
+        "AI ti radi jednoduchymi krokmi.",
         "Tahy vypocita az solver."
       ],
-      spokenText: `Este nie sme hotovi. ${missing} Vyber fotku, klikni spravnu stranu a oznac tri farby.`
+      spokenText: `Este nie sme hotovi. ${missing} Zober ihlan do ruky, ukaz jednu celu stranu a potom pomaly otoc na dalsiu.`
     };
   }
 
