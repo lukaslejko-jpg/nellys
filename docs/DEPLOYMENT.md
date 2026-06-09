@@ -40,6 +40,15 @@ Build settings:
 - Install command: `npm install`
 - Output directory: default
 
+The current Phase 1 Vercel build runs:
+
+```bash
+prisma generate && prisma migrate deploy && next build
+```
+
+This applies committed Prisma migrations to the connected Neon/PostgreSQL
+database before building the Next.js app.
+
 Minimum environment variables for the current Phase 1 deployment:
 
 ```text
@@ -63,7 +72,7 @@ STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 ```
 
-For the first Vercel deployment, `DATABASE_URL` should point to a hosted PostgreSQL database such as Neon or Supabase. Prisma migrations should be run deliberately from a controlled environment, not silently on every production build.
+For the first Vercel deployment, `DATABASE_URL` should point to a hosted PostgreSQL database such as Neon or Supabase. Schema changes must be committed as Prisma migrations before deployment.
 
 ## Deployment Rule
 
