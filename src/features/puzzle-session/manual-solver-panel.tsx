@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { deterministicScramble } from "@/lib/domain/pyraminx/fixtures";
+import {
+  createEmptyInspectionDraft,
+  pyraminxFaceIds,
+  stickerColorIds,
+  validateInspectionDraft,
+  type InspectionDraft,
+  type PyraminxFaceId,
+  type StickerColorId
+} from "@/lib/domain/pyraminx/media-inspection";
 import { inverseSequence, legalMoves, parseMoveSequence, type PyraminxMove } from "@/lib/domain/pyraminx/moves";
 import { applyMove, applySequence } from "@/lib/domain/pyraminx/simulator";
 import type { PyraminxState } from "@/lib/domain/pyraminx/state";
@@ -146,7 +155,11 @@ export function ManualSolverPanel() {
 
 export function PhotoUploadPanel() {
   const [media, setMedia] = useState<{ name: string; url: string; type: "image" | "video" }[]>([]);
+  const [activeMediaName, setActiveMediaName] = useState("");
+  const [activeFace, setActiveFace] = useState<PyraminxFaceId>("U");
+  const [draft, setDraft] = useState<InspectionDraft>(() => createEmptyInspectionDraft());
   const [status, setStatus] = useState("");
+  const validation = validateInspectionDraft(draft);
 
   useEffect(() => {
     return () => {
@@ -156,19 +169,52 @@ export function PhotoUploadPanel() {
 
   function handleMedia(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []).slice(0, 6);
+    const nextMedia = files.map((file) => ({
+      name: file.name,
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith("video/") || file.name.toLowerCase().endsWith(".qt") ? "video" as const : "image" as const
+    }));
+
     media.forEach((item) => URL.revokeObjectURL(item.url));
-    setMedia(
-      files.map((file) => ({
-        name: file.name,
-        url: URL.createObjectURL(file),
-        type: file.type.startsWith("video/") || file.name.toLowerCase().endsWith(".qt") ? "video" : "image"
-      }))
-    );
+    setMedia(nextMedia);
+    setActiveMediaName(nextMedia[0]?.name ?? "");
+    setDraft(createEmptyInspectionDraft());
     setStatus(
       files.length > 0
-        ? "Subory su pripravene ako lokalny nahlad. Rozpoznavanie stavu z videa este nie je zapnute."
+        ? "Subory su pripravene. Vyber stranu Pyraminxu a oznac tri kontrolne farby podla fotky."
         : ""
     );
+  }
+
+  function assignMediaToFace(face: PyraminxFaceId) {
+    if (!activeMediaName) {
+      setStatus("Najprv vyber fotku alebo video, ktore patri k tejto strane.");
+      return;
+    }
+
+    setActiveFace(face);
+    setDraft((current) => ({
+      captures: current.captures.map((capture) =>
+        capture.face === face ? { ...capture, mediaName: activeMediaName } : capture
+      )
+    }));
+    setStatus(`Strana ${face} je priradena k suboru ${activeMediaName}. Teraz oznac tri farby.`);
+  }
+
+  function setStickerColor(face: PyraminxFaceId, index: 0 | 1 | 2, color: StickerColorId) {
+    setDraft((current) => ({
+      captures: current.captures.map((capture) => {
+        if (capture.face !== face) return capture;
+        const colors = [...capture.colors] as typeof capture.colors;
+        colors[index] = color;
+        return { ...capture, colors };
+      })
+    }));
+  }
+
+  function confirmInspection() {
+    const result = validateInspectionDraft(draft);
+    setStatus(result.messageSk);
   }
 
   return (
@@ -176,7 +222,7 @@ export function PhotoUploadPanel() {
       <div>
         <h2>Foto / video upload</h2>
         <p className="muted">
-          Nahraj fotky alebo kratke video Pyraminxu pre nahlad. Stav ani tahy sa z media zatial negeneruju.
+          Nahraj fotky alebo kratke video a pouzi ich ako podklad na potvrdenie farieb. Tahy sa z media negeneruju.
         </p>
       </div>
       <label className="upload-box">
@@ -184,17 +230,87 @@ export function PhotoUploadPanel() {
         <input accept="image/*,video/*,.qt,.mov,.mp4" multiple onChange={handleMedia} type="file" />
       </label>
       {media.length > 0 ? (
-        <div className="photo-grid">
-          {media.map((item) => (
-            <figure key={item.url}>
-              {item.type === "video" ? (
-                <video controls muted playsInline src={item.url} />
-              ) : (
-                <img alt={item.name} src={item.url} />
-              )}
-              <figcaption>{item.name}</figcaption>
-            </figure>
-          ))}
+        <div className="inspection-workflow">
+          <div className="photo-grid">
+            {media.map((item) => (
+              <figure className={activeMediaName === item.name ? "active-media" : ""} key={item.url}>
+                <button
+                  aria-label={`Vybrat subor ${item.name}`}
+                  className="media-select"
+                  onClick={() => setActiveMediaName(item.name)}
+                  type="button"
+                >
+                  {item.type === "video" ? (
+                    <video controls muted playsInline src={item.url} />
+                  ) : (
+                    <img alt={item.name} src={item.url} />
+                  )}
+                </button>
+                <figcaption>{item.name}</figcaption>
+              </figure>
+            ))}
+          </div>
+
+          <div className="inspection-panel">
+            <div className="state-summary">
+              <span>Aktivny subor</span>
+              <strong>{activeMediaName || "ziadny"}</strong>
+            </div>
+            <div className="face-tabs" aria-label="Strany Pyraminxu">
+              {pyraminxFaceIds.map((face) => (
+                <button
+                  className={activeFace === face ? "face-tab active" : "face-tab"}
+                  key={face}
+                  onClick={() => assignMediaToFace(face)}
+                  type="button"
+                >
+                  {face}
+                </button>
+              ))}
+            </div>
+            <div className="sticker-board">
+              {draft.captures
+                .filter((capture) => capture.face === activeFace)
+                .map((capture) => (
+                  <div key={capture.face}>
+                    <p className="muted">
+                      Strana {capture.face}: {capture.mediaName || "bez priradenej fotky"}
+                    </p>
+                    <div className="sticker-grid">
+                      {capture.colors.map((selected, index) => (
+                        <div className="sticker-cell" key={`${capture.face}-${index}`}>
+                          <span>bod {index + 1}</span>
+                          <div className="swatch-row">
+                            {stickerColorIds.map((color) => (
+                              <button
+                                aria-label={`Nastavit ${color} pre ${capture.face} bod ${index + 1}`}
+                                className={selected === color ? `swatch ${color} active` : `swatch ${color}`}
+                                key={color}
+                                onClick={() => setStickerColor(capture.face, index as 0 | 1 | 2, color)}
+                                type="button"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+            </div>
+            <button className="button" onClick={confirmInspection} type="button">
+              Overit foto inspekciu
+            </button>
+            <div className={validation.ok ? "solution-box" : "inspection-warning"}>
+              <span>{validation.ok ? "Pripravene" : "Chyba podklad"}</span>
+              <p>{validation.messageSk}</p>
+              {!validation.ok ? (
+                <p>
+                  Chybaju strany: {validation.missingFaces.length ? validation.missingFaces.join(", ") : "ziadne"}.
+                  Neoznacene body: {validation.missingStickers}.
+                </p>
+              ) : null}
+            </div>
+          </div>
         </div>
       ) : null}
       {status ? <p className="form-status">{status}</p> : null}

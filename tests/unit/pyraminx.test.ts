@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { deterministicScramble } from "../../src/lib/domain/pyraminx/fixtures.ts";
+import { createEmptyInspectionDraft, validateInspectionDraft } from "../../src/lib/domain/pyraminx/media-inspection.ts";
 import { inverseMove, inverseSequence, legalMoves, parseMoveSequence } from "../../src/lib/domain/pyraminx/moves.ts";
 import { solveState, verifySolution } from "../../src/lib/domain/pyraminx/solver.ts";
 import { applyMove, applySequence } from "../../src/lib/domain/pyraminx/simulator.ts";
@@ -48,6 +49,30 @@ test("move sequence parser rejects illegal tokens", () => {
 
   assert.equal(parsed.ok, false);
   assert.deepEqual(parsed.ok ? [] : parsed.invalidTokens, ["X", "R2"]);
+});
+
+test("media inspection draft requires every face and sticker color", () => {
+  const draft = createEmptyInspectionDraft();
+  const validation = validateInspectionDraft(draft);
+
+  assert.equal(validation.ok, false);
+  assert.deepEqual(validation.ok ? [] : validation.missingFaces, ["U", "L", "R", "B"]);
+  assert.equal(validation.ok ? 0 : validation.missingStickers, 12);
+});
+
+test("media inspection draft accepts user confirmed face captures", () => {
+  const draft = createEmptyInspectionDraft();
+  const filled = {
+    captures: draft.captures.map((capture) => ({
+      ...capture,
+      mediaName: `${capture.face}.jpg`,
+      colors: ["red", "green", "blue"] as typeof capture.colors
+    }))
+  };
+  const validation = validateInspectionDraft(filled);
+
+  assert.equal(validation.ok, true);
+  assert.equal(validation.ok ? validation.totalStickers : 0, 12);
 });
 
 test("solver returns verified solutions for deterministic short scrambles", () => {
