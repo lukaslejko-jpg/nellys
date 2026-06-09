@@ -1,20 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ChangeEvent } from "react";
+import { deterministicScramble } from "@/lib/domain/pyraminx/fixtures";
+import { legalMoves, type PyraminxMove } from "@/lib/domain/pyraminx/moves";
+import { applyMove, applySequence } from "@/lib/domain/pyraminx/simulator";
 import type { PyraminxState } from "@/lib/domain/pyraminx/state";
-import { createSolvedState, serializeState } from "@/lib/domain/pyraminx/state";
+import { createSolvedState, isSolved, serializeState } from "@/lib/domain/pyraminx/state";
 
 type ApiResult =
   | { ok: true; session: { id: string; status: string; solutionMoves?: string[] | null } }
   | { ok: false; code: string; messageSk?: string };
 
 export function ManualSolverPanel() {
-  const [state] = useState<PyraminxState>(() => createSolvedState());
+  const [state, setState] = useState<PyraminxState>(() => createSolvedState());
+  const [inputMoves, setInputMoves] = useState<PyraminxMove[]>([]);
   const [status, setStatus] = useState("");
   const [moves, setMoves] = useState<string[] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const demoScramble = deterministicScramble(20260609, 4);
 
-  async function runSolvedFlow() {
+  function applyUiMove(move: PyraminxMove) {
+    setState((current) => applyMove(current, move));
+    setInputMoves((current) => [...current, move]);
+    setMoves(null);
+    setStatus("");
+  }
+
+  function applyDemoScramble() {
+    setState(applySequence(createSolvedState(), demoScramble));
+    setInputMoves(demoScramble);
+    setMoves(null);
+    setStatus("Demo scramble bol vytvoreny deterministickym simulatorom.");
+  }
+
+  function resetState() {
+    setState(createSolvedState());
+    setInputMoves([]);
+    setMoves(null);
+    setStatus("Stav bol resetovany na vyrieseny Pyraminx.");
+  }
+
+  async function runSolverFlow() {
     setIsSubmitting(true);
     setStatus("");
     setMoves(null);
@@ -32,7 +59,7 @@ export function ManualSolverPanel() {
       if (!solved.ok) return setStatus(solved.messageSk ?? "Solver tok sa nepodarilo dokoncit.");
 
       setMoves(solved.session.solutionMoves ?? []);
-      setStatus("Stav bol vypocitany a overeny deterministickym solverom.");
+      setStatus("Riesenie vypocital a overil deterministicky solver.");
     } catch {
       setStatus("Poziadavka zlyhala. Skontroluj prihlasenie a databazu.");
     } finally {
@@ -45,11 +72,33 @@ export function ManualSolverPanel() {
       <div>
         <h2>Nove riesenie</h2>
         <p className="muted">
-          Prvy manualny tok pouziva znamy solved state. Dalsi krok bude editor farieb.
+          Manualne vytvor stav cez legalne Pyraminx tahy a spusti solver cez API.
         </p>
       </div>
-      <button className="button" disabled={isSubmitting} onClick={runSolvedFlow} type="button">
-        {isSubmitting ? "Overujem..." : "Overit solved state"}
+      <div className="move-pad" aria-label="Legalne Pyraminx tahy">
+        {legalMoves.map((move) => (
+          <button className="move-button" key={move} onClick={() => applyUiMove(move)} type="button">
+            {move}
+          </button>
+        ))}
+      </div>
+      <div className="solver-actions">
+        <button className="button secondary" onClick={applyDemoScramble} type="button">
+          Demo scramble
+        </button>
+        <button className="button secondary" onClick={resetState} type="button">
+          Reset
+        </button>
+      </div>
+      <div className="state-summary">
+        <span>Stav</span>
+        <strong>{isSolved(state) ? "Vyrieseny" : "Zmeneny"}</strong>
+      </div>
+      <p className="muted">
+        Zadane tahy: {inputMoves.length > 0 ? inputMoves.join(" ") : "ziadne"}
+      </p>
+      <button className="button" disabled={isSubmitting} onClick={runSolverFlow} type="button">
+        {isSubmitting ? "Pocitam..." : "Vypocitat riesenie"}
       </button>
       {status ? <p className="form-status">{status}</p> : null}
       {moves ? (
@@ -59,6 +108,54 @@ export function ManualSolverPanel() {
         <summary>Manualny vstup pre tento krok</summary>
         <pre>{serializeState(state)}</pre>
       </details>
+    </div>
+  );
+}
+
+export function PhotoUploadPanel() {
+  const [photos, setPhotos] = useState<{ name: string; url: string }[]>([]);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    return () => {
+      photos.forEach((photo) => URL.revokeObjectURL(photo.url));
+    };
+  }, [photos]);
+
+  function handlePhotos(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []).slice(0, 4);
+    photos.forEach((photo) => URL.revokeObjectURL(photo.url));
+    setPhotos(files.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })));
+    setStatus(
+      files.length > 0
+        ? "Fotky su pripravene ako lokalny nahlad. AI rozpoznavanie este nie je zapnute."
+        : ""
+    );
+  }
+
+  return (
+    <div className="manual-solver">
+      <div>
+        <h2>Foto upload</h2>
+        <p className="muted">
+          Nahraj fotky Pyraminxu pre nahlad. Stav aj tahy sa z fotky zatial negeneruju.
+        </p>
+      </div>
+      <label className="upload-box">
+        <span>Vybrat fotky</span>
+        <input accept="image/*" multiple onChange={handlePhotos} type="file" />
+      </label>
+      {photos.length > 0 ? (
+        <div className="photo-grid">
+          {photos.map((photo) => (
+            <figure key={photo.url}>
+              <img alt={photo.name} src={photo.url} />
+              <figcaption>{photo.name}</figcaption>
+            </figure>
+          ))}
+        </div>
+      ) : null}
+      {status ? <p className="form-status">{status}</p> : null}
     </div>
   );
 }

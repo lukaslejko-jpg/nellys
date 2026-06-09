@@ -1,7 +1,7 @@
 import { createSolvedState, serializeState } from "@/lib/domain/pyraminx/state";
 import { solveState } from "@/lib/domain/pyraminx/solver";
 import { SessionSummary } from "@/features/auth/session-summary";
-import { ManualSolverPanel } from "@/features/puzzle-session/manual-solver-panel";
+import { ManualSolverPanel, PhotoUploadPanel } from "@/features/puzzle-session/manual-solver-panel";
 
 export default function AppDashboardPage() {
   const solved = createSolvedState();
@@ -12,13 +12,16 @@ export default function AppDashboardPage() {
       <section className="panel dashboard-panel">
         <h1>Nellys aplikacia</h1>
         <p className="muted">
-          Faza 1 zaklada manualny tok a solver jadro. Foto a AI rozpoznavanie
-          zostavaju feature-flagovane, kym nebudu validovane.
+          Faza 1 zaklada manualny tok, foto nahlad a solver jadro. AI rozpoznavanie
+          ostava vypnute, kym nebude validovane.
         </p>
         <SessionSummary />
-        <div className="grid">
+        <div className="workspace-grid">
           <div className="panel">
             <ManualSolverPanel />
+          </div>
+          <div className="panel">
+            <PhotoUploadPanel />
           </div>
           <div className="panel">
             <h2>Solver jadro</h2>

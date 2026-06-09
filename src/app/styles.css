@@ -181,6 +181,13 @@ a {
   margin-top: 24px;
 }
 
+.workspace-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  margin-top: 24px;
+}
+
 .auth-banner {
   align-items: center;
   background: #eef3f8;
@@ -205,6 +212,94 @@ a {
 
 .manual-solver .button {
   width: 100%;
+}
+
+.solver-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.solver-actions .button {
+  width: 100%;
+}
+
+.move-pad {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.move-button {
+  background: #eef3f8;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  min-height: 38px;
+}
+
+.state-summary {
+  align-items: center;
+  background: #eef3f8;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.state-summary span {
+  color: var(--muted);
+}
+
+.upload-box {
+  align-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  min-height: 104px;
+  place-items: center;
+  text-align: center;
+}
+
+.upload-box span {
+  font-weight: 800;
+}
+
+.upload-box input {
+  display: none;
+}
+
+.photo-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.photo-grid figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.photo-grid img {
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.photo-grid figcaption {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  padding-top: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 details {
@@ -232,7 +327,8 @@ pre {
 
   .topbar,
   .hero,
-  .grid {
+  .grid,
+  .workspace-grid {
     grid-template-columns: 1fr;
   }
 
