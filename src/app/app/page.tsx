@@ -12,7 +12,7 @@ export default function AppDashboardPage() {
       <section className="panel dashboard-panel">
         <h1>Nellys aplikacia</h1>
         <p className="muted">
-          Faza 1 zaklada manualny tok, foto nahlad a solver jadro. AI rozpoznavanie
+          Faza 1 zaklada manualny tok, foto/video nahlad a solver jadro. AI rozpoznavanie
           ostava vypnute, kym nebude validovane.
         </p>
         <SessionSummary />

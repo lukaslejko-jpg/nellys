@@ -318,7 +318,8 @@ a {
   min-width: 0;
 }
 
-.photo-grid img {
+.photo-grid img,
+.photo-grid video {
   aspect-ratio: 1;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -334,6 +335,24 @@ a {
   padding-top: 6px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.suggestion-list {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.suggestion-list strong {
+  color: #9a3412;
+}
+
+.suggestion-list p {
+  color: var(--muted);
+  margin: 0;
 }
 
 details {

@@ -145,22 +145,28 @@ export function ManualSolverPanel() {
 }
 
 export function PhotoUploadPanel() {
-  const [photos, setPhotos] = useState<{ name: string; url: string }[]>([]);
+  const [media, setMedia] = useState<{ name: string; url: string; type: "image" | "video" }[]>([]);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
     return () => {
-      photos.forEach((photo) => URL.revokeObjectURL(photo.url));
+      media.forEach((item) => URL.revokeObjectURL(item.url));
     };
-  }, [photos]);
+  }, [media]);
 
-  function handlePhotos(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []).slice(0, 4);
-    photos.forEach((photo) => URL.revokeObjectURL(photo.url));
-    setPhotos(files.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })));
+  function handleMedia(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []).slice(0, 6);
+    media.forEach((item) => URL.revokeObjectURL(item.url));
+    setMedia(
+      files.map((file) => ({
+        name: file.name,
+        url: URL.createObjectURL(file),
+        type: file.type.startsWith("video/") || file.name.toLowerCase().endsWith(".qt") ? "video" : "image"
+      }))
+    );
     setStatus(
       files.length > 0
-        ? "Fotky su pripravene ako lokalny nahlad. AI rozpoznavanie este nie je zapnute."
+        ? "Subory su pripravene ako lokalny nahlad. Rozpoznavanie stavu z videa este nie je zapnute."
         : ""
     );
   }
@@ -168,26 +174,36 @@ export function PhotoUploadPanel() {
   return (
     <div className="manual-solver">
       <div>
-        <h2>Foto upload</h2>
+        <h2>Foto / video upload</h2>
         <p className="muted">
-          Nahraj fotky Pyraminxu pre nahlad. Stav aj tahy sa z fotky zatial negeneruju.
+          Nahraj fotky alebo kratke video Pyraminxu pre nahlad. Stav ani tahy sa z media zatial negeneruju.
         </p>
       </div>
       <label className="upload-box">
-        <span>Vybrat fotky</span>
-        <input accept="image/*" multiple onChange={handlePhotos} type="file" />
+        <span>Vybrat fotky alebo video</span>
+        <input accept="image/*,video/*,.qt,.mov,.mp4" multiple onChange={handleMedia} type="file" />
       </label>
-      {photos.length > 0 ? (
+      {media.length > 0 ? (
         <div className="photo-grid">
-          {photos.map((photo) => (
-            <figure key={photo.url}>
-              <img alt={photo.name} src={photo.url} />
-              <figcaption>{photo.name}</figcaption>
+          {media.map((item) => (
+            <figure key={item.url}>
+              {item.type === "video" ? (
+                <video controls muted playsInline src={item.url} />
+              ) : (
+                <img alt={item.name} src={item.url} />
+              )}
+              <figcaption>{item.name}</figcaption>
             </figure>
           ))}
         </div>
       ) : null}
       {status ? <p className="form-status">{status}</p> : null}
+      <div className="suggestion-list">
+        <strong>Dalsie kroky pre video</strong>
+        <p>1. Vybrat 4-8 ostrych snimok z videa.</p>
+        <p>2. Pouzivatel potvrdi farby na kazdej strane.</p>
+        <p>3. Validator vytvori stav a solver ho overi simulaciou.</p>
+      </div>
     </div>
   );
 }
