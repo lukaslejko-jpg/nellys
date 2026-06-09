@@ -116,42 +116,43 @@ export function createInspectionGuide(draft: InspectionDraft): InspectionGuide {
       : `Chyba este ${validation.missingStickers} farebnych bodov.`;
 
     return {
-      title: "AI sprievodca caka na kompletne podklady",
+      title: "Co spravit teraz",
       summary: missing,
       nextActions: [
-        "Ak mas Pyraminx v ruke, odfot alebo natoc styri hlavne strany: U, L, R a B.",
-        "Vyber aktivnu fotku a klikni stranu, ktorej fotka patri.",
-        "Oznac tri kontrolne farby pre kazdu stranu.",
-        "Ak mas klasicku Rubikovu kocku, tento model ju zatial nevyriesi. Tento tok je pre ihlan Pyraminx."
+        "Odfot alebo natoc cely ihlan.",
+        "Vyber fotku jednej strany.",
+        "Klikni, ci je to strana U, L, R alebo B.",
+        "Oznac tri farby na tejto strane.",
+        "Zopakuj to pre vsetky styri strany."
       ],
       aiBoundaries: [
-        "AI moze vysvetlit, co chyba.",
-        "AI nesmie doplnit farby ani tahy za teba.",
-        "Solver sa spusti az nad deterministicky overenym stavom."
+        "Tento tok je pre ihlan Pyraminx.",
+        "AI ti radi, ale farby potvrdis ty.",
+        "Tahy vypocita az solver."
       ],
-      spokenText: `Inspekcia este nie je kompletna. ${missing} Nafot alebo natoc styri strany ihlanu Pyraminx, potom prirad fotky ku stranam a oznac farby.`
+      spokenText: `Este nie sme hotovi. ${missing} Vyber fotku, klikni spravnu stranu a oznac tri farby.`
     };
   }
 
-  const summary = `Mam potvrdene strany ${confirmedFaces.join(", ")} a 12 kontrolnych farieb.`;
+  const summary = `Fotky su pripravene: ${confirmedFaces.join(", ")}. Farby su oznacene.`;
 
   return {
-    title: "AI sprievodca: co spravit dalej",
+    title: "Dalsi krok",
     summary,
     nextActions: [
-      "Teraz z fotiek este nemam hotovy vypocitatelny stav. Fotky sluzia ako kontrola farieb a orientacie.",
-      "Ak poznas scramble, vloz ho do pola Scramble zapis a klikni Pouzit scramble.",
-      "Ak scramble nepoznas, v manualnom solveri postupne naklikaj legalne tahy tak, aby stav zodpovedal hlavolamu.",
-      "Potom klikni Vypocitat riesenie. Tahy vypocita a overi iba deterministicky solver.",
-      "Ked sa zobrazi riesenie, vykonavaj tahy zlava doprava. Po kazdom tahu skontroluj, ci sa realny hlavolam stale zhoduje s ocakavanym stavom."
+      "Skontroluj, ci fotky sedia s tvojim ihlanom.",
+      "Ak vies, ako si ihlan pomiesal, napis tieto tahy do pola nizsie.",
+      "Ak tahy nevies, nastav rovnaky ihlan manualne v solveri.",
+      "Stlac Vypocitat riesenie.",
+      "Rob tahy po jednom. Po kazdom tahu sa pozri, ci ihlan vyzera spravne."
     ],
     aiBoundaries: [
-      "AI teraz funguje ako sprievodca a kontrolor postupu.",
-      "AI nevymysla tahy z fotiek.",
-      "Foto inspekcia je podklad pre dalsi validator, nie hotove riesenie."
+      "AI vysvetluje iba dalsi krok.",
+      "AI nevymysla tahy.",
+      "Tahy musi vypocitat solver."
     ],
     spokenText:
-      "Inspekcia je kompletna. Fotky su kontrolny podklad, nie hotove riesenie. Teraz mas dve moznosti. Ak poznas scramble, vloz ho do scramble pola a pouzi solver. Ak scramble nepoznas, naklikaj stav manualnymi tahmi. Riesenie smie vypocitat iba deterministicky solver."
+      "Fotky su pripravene. Skontroluj farby. Ak poznas tahy, napis ich do pola nizsie. Ak ich nepoznas, nastav ihlan manualne. Potom stlac vypocitat riesenie."
   };
 }
 
