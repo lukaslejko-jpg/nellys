@@ -8,37 +8,50 @@ export default function AppDashboardPage() {
   const solution = solveState(solved);
 
   return (
-    <main className="shell">
-      <section className="panel dashboard-panel">
-        <h1>Nellys aplikacia</h1>
-        <p className="muted">
-          Faza 1 zaklada manualny tok, foto/video nahlad a solver jadro. AI rozpoznavanie
-          ostava vypnute, kym nebude validovane.
-        </p>
-        <SessionSummary />
-        <div className="workspace-grid">
-          <div className="panel">
-            <ManualSolverPanel />
-          </div>
-          <div className="panel">
-            <PhotoUploadPanel />
-          </div>
-          <div className="panel">
-            <h2>Solver jadro</h2>
-            <p className="muted">
-              Solved state vracia: {solution.ok ? solution.moves.join(" ") || "ziadne tahy" : solution.error}
-            </p>
-          </div>
-          <div className="panel">
-            <h2>Stav</h2>
-            <p className="muted">Auth, server-side session cookie a zakladne solver API su pripravene.</p>
-          </div>
+    <main className="shell app-shell">
+      <section className="dashboard-hero">
+        <div>
+          <p className="eyebrow">Nellys workspace</p>
+          <h1>Nellys aplikacia</h1>
+          <p className="muted">
+            Manualny tok, scramble solver a foto/video nahlad. AI rozpoznavanie
+            ostava vypnute, kym nebude validovane.
+          </p>
         </div>
-        <details>
-          <summary>Technicky solved state</summary>
-          <pre>{serializeState(solved)}</pre>
-        </details>
+        <SessionSummary />
       </section>
+
+      <section className="status-grid" aria-label="Stav systemu">
+        <div className="status-card">
+          <span>Solver</span>
+          <strong>{solution.ok ? "Pripraveny" : "Chyba"}</strong>
+          <small>{solution.ok ? "Solved state: ziadne tahy" : solution.error}</small>
+        </div>
+        <div className="status-card">
+          <span>Vstup</span>
+          <strong>Manual + media</strong>
+          <small>Foto/video zatial iba ako nahlad.</small>
+        </div>
+        <div className="status-card">
+          <span>Bezpecnost</span>
+          <strong>Bez AI tahov</strong>
+          <small>Riesenie generuje simulator a solver.</small>
+        </div>
+      </section>
+
+      <section className="workspace-grid">
+        <div className="panel feature-panel">
+          <ManualSolverPanel />
+        </div>
+        <div className="panel feature-panel">
+          <PhotoUploadPanel />
+        </div>
+      </section>
+
+      <details className="technical-details">
+        <summary>Technicky solved state</summary>
+        <pre>{serializeState(solved)}</pre>
+      </details>
     </main>
   );
 }

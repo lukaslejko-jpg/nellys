@@ -2,9 +2,12 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main className="shell">
+    <main className="shell marketing-shell">
       <header className="topbar">
-        <div className="brand">Nellys <span>Solver</span></div>
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          Nellys <span>Pyraminx Solver</span>
+        </div>
         <nav className="nav" aria-label="Hlavna navigacia">
           <Link className="button secondary" href="/auth/login">Prihlasenie</Link>
           <Link className="button" href="/auth/register">Registracia</Link>
@@ -13,39 +16,44 @@ export default function HomePage() {
 
       <section className="hero">
         <div>
+          <p className="eyebrow">Deterministicky puzzle solver</p>
           <h1>Nellys</h1>
           <p className="lead">
-            Puzzle Solver pre Pyraminx. AI pomoze s fotkou a vysvetlenim,
-            ale kazdy tah vypocita a overi deterministicky solver.
+            Pyraminx solver, ktory nikdy nehada tahy. Manualny vstup,
+            scramble zapis a foto/video nahlad smeruju do overeneho simulatora.
           </p>
           <div className="nav">
             <Link className="button" href="/auth/register">Vytvorit ucet</Link>
             <Link className="button secondary" href="/auth/login">Prihlasit sa</Link>
-            <Link className="button secondary" href="/admin">Sprava</Link>
           </div>
         </div>
-        <div className="panel" aria-label="Farebny motiv hlavolamu">
-          <div className="puzzle-mark">
-            <div className="tile red" />
-            <div className="tile green" />
-            <div className="tile blue" />
-            <div className="tile yellow" />
+        <div className="pyraminx-stage" aria-label="Farebny Pyraminx motiv">
+          <div className="pyraminx-object">
+            <span className="facet facet-top" />
+            <span className="facet facet-left" />
+            <span className="facet facet-right" />
+            <span className="facet facet-core" />
+          </div>
+          <div className="stage-strip">
+            <span>Manual</span>
+            <span>Simulator</span>
+            <span>Solver</span>
           </div>
         </div>
       </section>
 
       <section className="grid" aria-label="Zakladne pravidla">
         <div className="panel">
-          <h2>Otoc</h2>
-          <p className="muted">Jeden pohyb znamena jedno zacvaknutie o 120 stupnov.</p>
+          <h2>Zadaj scramble</h2>
+          <p className="muted">Pouzi zapis ako U R' L B a Nellys ho odsimuluje.</p>
         </div>
         <div className="panel">
-          <h2>Over</h2>
-          <p className="muted">Neisty stav musi potvrdit pouzivatel alebo validator.</p>
+          <h2>Over stav</h2>
+          <p className="muted">Neisty foto/video vstup musi prejst potvrdenim farieb.</p>
         </div>
         <div className="panel">
           <h2>Vyries</h2>
-          <p className="muted">Sekvencia sa zobrazi az po simulacnom overeni.</p>
+          <p className="muted">Sekvencia sa zobrazi az po deterministickom overeni.</p>
         </div>
       </section>
     </main>
