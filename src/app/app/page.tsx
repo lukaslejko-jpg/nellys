@@ -1,6 +1,7 @@
 import { createSolvedState, serializeState } from "@/lib/domain/pyraminx/state";
 import { solveState } from "@/lib/domain/pyraminx/solver";
 import { SessionSummary } from "@/features/auth/session-summary";
+import { ManualSolverPanel } from "@/features/puzzle-session/manual-solver-panel";
 
 export default function AppDashboardPage() {
   const solved = createSolvedState();
@@ -17,8 +18,7 @@ export default function AppDashboardPage() {
         <SessionSummary />
         <div className="grid">
           <div className="panel">
-            <h2>Nove riesenie</h2>
-            <p className="muted">Manualne zadanie bude prvy produkcny vstup pred foto/AI skenom.</p>
+            <ManualSolverPanel />
           </div>
           <div className="panel">
             <h2>Solver jadro</h2>

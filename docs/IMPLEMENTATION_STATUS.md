@@ -92,6 +92,10 @@
   - login redirects to `/app` after the session cookie is issued,
   - dashboard checks `GET /api/auth/me`,
   - dashboard exposes logout through `POST /api/auth/logout`.
+- Added first manual solver UI panel:
+  - creates a puzzle session from the authenticated cookie,
+  - saves a known solved Pyraminx state,
+  - runs the deterministic solver API and shows verified moves.
 - Adjusted CI to use `npm install` until `package-lock.json` exists.
 
 ## Verification

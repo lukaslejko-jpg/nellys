@@ -194,6 +194,11 @@ a {
   margin: 0;
 }
 
+.manual-solver {
+  display: grid;
+  gap: 14px;
+}
+
 details {
   margin-top: 20px;
 }
