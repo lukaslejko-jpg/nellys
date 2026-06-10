@@ -15,10 +15,9 @@ import {
   type PyraminxFaceId,
   type StickerColorId
 } from "@/lib/domain/pyraminx/media-inspection";
-import { inverseSequence, legalMoves, parseMoveSequence, type PyraminxMove } from "@/lib/domain/pyraminx/moves";
-import { applyMove, applySequence } from "@/lib/domain/pyraminx/simulator";
-import type { PyraminxState } from "@/lib/domain/pyraminx/state";
-import { createSolvedState, isSolved, serializeState } from "@/lib/domain/pyraminx/state";
+import type { PyraminxMove } from "@/lib/domain/pyraminx/moves";
+import { applySequence } from "@/lib/domain/pyraminx/simulator";
+import { createSolvedState } from "@/lib/domain/pyraminx/state";
 import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/camera-capture";
 import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
@@ -27,50 +26,9 @@ type ApiResult =
   | { ok: false; code: string; messageSk?: string };
 
 export function ManualSolverPanel() {
-  const [state, setState] = useState<PyraminxState>(() => createSolvedState());
-  const [inputMoves, setInputMoves] = useState<PyraminxMove[]>([]);
-  const [scrambleText, setScrambleText] = useState("");
   const [status, setStatus] = useState("");
   const [moves, setMoves] = useState<string[] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const demoScramble = deterministicScramble(20260609, 4);
-
-  function applyUiMove(move: PyraminxMove) {
-    setState((current) => applyMove(current, move));
-    setInputMoves((current) => [...current, move]);
-    setMoves(null);
-    setStatus("");
-  }
-
-  function applyDemoScramble() {
-    setState(applySequence(createSolvedState(), demoScramble));
-    setInputMoves(demoScramble);
-    setScrambleText(demoScramble.join(" "));
-    setMoves(null);
-    setStatus("Demo scramble bol vytvoreny deterministickym simulatorom.");
-  }
-
-  function resetState() {
-    setState(createSolvedState());
-    setInputMoves([]);
-    setScrambleText("");
-    setMoves(null);
-    setStatus("Stav bol resetovany na vyrieseny Pyraminx.");
-  }
-
-  function applyScrambleText() {
-    const parsed = parseMoveSequence(scrambleText);
-    if (!parsed.ok) {
-      setStatus(`Neplatne tahy: ${parsed.invalidTokens.join(", ")}`);
-      setMoves(null);
-      return;
-    }
-
-    setState(applySequence(createSolvedState(), parsed.moves));
-    setInputMoves(parsed.moves);
-    setMoves(inverseSequence(parsed.moves));
-    setStatus("Scramble bol odsimulovany. Inverzne riesenie je vypocitane deterministicky.");
-  }
 
   async function runSolverFlow() {
     setIsSubmitting(true);
@@ -78,6 +36,9 @@ export function ManualSolverPanel() {
     setMoves(null);
 
     try {
+      const scramble = deterministicScramble(20260609, 4);
+      const state = applySequence(createSolvedState(), scramble);
+
       const created = await postJson<ApiResult>("/api/puzzle-sessions");
       if (!created.ok) return setStatus(created.messageSk ?? "Session sa nepodarilo vytvorit.");
 
@@ -90,7 +51,6 @@ export function ManualSolverPanel() {
       if (!solved.ok) return setStatus(solved.messageSk ?? "Solver tok sa nepodarilo dokoncit.");
 
       setMoves(solved.session.solutionMoves ?? []);
-      setStatus("Riesenie vypocital a overil deterministicky solver.");
     } catch {
       setStatus("Poziadavka zlyhala. Skontroluj prihlasenie a databazu.");
     } finally {
@@ -106,54 +66,11 @@ export function ManualSolverPanel() {
           Zatlač na "Vypočítať riešenie" a Nellys ti ukáže animovaný návod krok za krokom.
         </p>
       </div>
-      <div className="move-pad" aria-label="Legalne Pyraminx tahy">
-        {legalMoves.map((move) => (
-          <button className="move-button" key={move} onClick={() => applyUiMove(move)} type="button">
-            {move}
-          </button>
-        ))}
-      </div>
-      <label className="field compact-field">
-        <span>Scramble zapis</span>
-        <textarea
-          onChange={(event) => setScrambleText(event.target.value)}
-          placeholder="napr. U R' L B"
-          rows={2}
-          value={scrambleText}
-        />
-      </label>
-      <div className="solver-actions three-actions">
-        <button className="button secondary" onClick={applyScrambleText} type="button">
-          Pouzit scramble
-        </button>
-        <button className="button secondary" onClick={applyDemoScramble} type="button">
-          Demo scramble
-        </button>
-        <button className="button secondary" onClick={resetState} type="button">
-          Reset
-        </button>
-      </div>
-      <div className="state-summary">
-        <span>Stav</span>
-        <strong>{isSolved(state) ? "Vyrieseny" : "Zmeneny"}</strong>
-      </div>
-      <p className="muted">
-        Zadane tahy: {inputMoves.length > 0 ? inputMoves.join(" ") : "ziadne"}
-      </p>
       <button className="button" disabled={isSubmitting} onClick={runSolverFlow} type="button">
         {isSubmitting ? "Pocitam..." : "Vypocitat riesenie"}
       </button>
       {status ? <p className="form-status">{status}</p> : null}
-      {moves ? (
-        <div>
-          <h3>2. Animovany navod</h3>
-          <SolveGuide moves={moves as PyraminxMove[]} />
-        </div>
-      ) : null}
-      <details>
-        <summary>Manualny vstup pre tento krok</summary>
-        <pre>{serializeState(state)}</pre>
-      </details>
+      {moves ? <SolveGuide moves={moves as PyraminxMove[]} /> : null}
     </div>
   );
 }
