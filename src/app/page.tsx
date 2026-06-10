@@ -22,10 +22,6 @@ export default function HomePage() {
             Odfoť svoj Pyraminx a Nellys ti hneď ukáže veselý, animovaný návod
             krok za krokom – jednoducho, rýchlo a so zábavou! 🔺✨
           </p>
-          <div className="nav">
-            <Link className="button" href="/auth/register">Vytvoriť účet 🚀</Link>
-            <Link className="button secondary" href="/auth/login">Prihlásiť sa</Link>
-          </div>
         </div>
         <div className="pyraminx-stage" aria-label="Maskot Nellys">
           <div className="pyraminx-object">
