@@ -525,6 +525,84 @@ h2 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.solve-guide {
+  display: grid;
+  gap: 12px;
+}
+
+.solve-stage {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  padding: 18px;
+  place-items: center;
+  position: relative;
+}
+
+.solve-triangle {
+  max-width: 220px;
+  width: 100%;
+}
+
+.solve-triangle polygon {
+  fill: #eef3fb;
+  stroke: var(--navy);
+  stroke-width: 1.4;
+}
+
+.solve-triangle line {
+  stroke: var(--navy);
+  stroke-width: 0.8;
+}
+
+.solve-mark {
+  fill: var(--yellow);
+  stroke: var(--navy);
+  stroke-width: 1.2;
+  animation: solve-pulse 1s ease-in-out infinite;
+}
+
+@keyframes solve-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+
+.solve-arrow {
+  font-size: 40px;
+  position: absolute;
+}
+
+.solve-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.speed-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.step-jump {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 10px;
+  grid-template-columns: 34px 1fr;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.step-jump.active span {
+  background: var(--blue);
+}
+
 .camera-thumbs img {
   aspect-ratio: 1;
   border: 1px solid var(--line);

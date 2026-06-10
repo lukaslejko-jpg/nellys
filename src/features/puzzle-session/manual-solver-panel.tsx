@@ -20,6 +20,7 @@ import { applyMove, applySequence } from "@/lib/domain/pyraminx/simulator";
 import type { PyraminxState } from "@/lib/domain/pyraminx/state";
 import { createSolvedState, isSolved, serializeState } from "@/lib/domain/pyraminx/state";
 import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/camera-capture";
+import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
 type ApiResult =
   | { ok: true; session: { id: string; status: string; solutionMoves?: string[] | null } }
@@ -144,9 +145,9 @@ export function ManualSolverPanel() {
       </button>
       {status ? <p className="form-status">{status}</p> : null}
       {moves ? (
-        <div className="solution-box">
-          <span>Riesenie</span>
-          <strong>{moves.length > 0 ? moves.join(" ") : "ziadne tahy"}</strong>
+        <div>
+          <h3>2. Animovany navod</h3>
+          <SolveGuide moves={moves as PyraminxMove[]} />
         </div>
       ) : null}
       <details>
