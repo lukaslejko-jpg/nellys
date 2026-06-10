@@ -745,19 +745,14 @@ h2 {
   width: 100%;
 }
 
-.solve-triangle polygon {
+.solve-face {
   fill: #eef3fb;
   stroke: var(--navy);
   stroke-width: 1.4;
-}
-
-.solve-triangle line {
-  stroke: var(--navy);
-  stroke-width: 0.8;
+  transition: fill 0.2s ease;
 }
 
 .solve-mark {
-  fill: var(--yellow);
   stroke: var(--navy);
   stroke-width: 1.2;
   animation: solve-pulse 1s ease-in-out infinite;
@@ -771,6 +766,18 @@ h2 {
 .solve-arrow {
   font-size: 40px;
   position: absolute;
+}
+
+.solve-arrow.cw { color: var(--blue); }
+.solve-arrow.ccw { color: var(--red); }
+
+.solve-color-dot {
+  border-radius: 50%;
+  display: inline-block;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: middle;
+  width: 14px;
 }
 
 .solve-controls {
@@ -1049,13 +1056,9 @@ h2 {
 }
 
 .guide-steps li {
-  align-items: center;
   background: #ffffff;
   border: 1px solid #c7dbff;
   border-radius: 8px;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 34px 1fr;
   line-height: 1.35;
   padding: 10px;
 }
