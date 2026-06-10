@@ -105,6 +105,11 @@ export function CameraCapture({
 
   return (
     <div className="camera-capture">
+      <div className="live-coach" aria-live="polite">
+        <small>Strana {stepIndex + 1} z {pyraminxFaceIds.length}</small>
+        <strong>{prompt.title}</strong>
+        <p>{prompt.body}</p>
+      </div>
       <div className="camera-frame">
         <video ref={videoRef} autoPlay muted playsInline className="camera-video" />
         <svg className="camera-overlay" viewBox="0 0 100 100" aria-hidden="true">
@@ -121,16 +126,13 @@ export function CameraCapture({
       </div>
       <canvas ref={canvasRef} className="camera-canvas-hidden" />
       {error ? <p className="form-status">{error}</p> : null}
-      <div className="live-coach" aria-live="polite">
-        <small>Strana {stepIndex + 1} z {pyraminxFaceIds.length}</small>
-        <strong>{prompt.title}</strong>
-        <p>{prompt.body}</p>
-      </div>
-      <div className="camera-thumbs">
-        {captures.map((capture) => (
-          <img key={capture.face} src={capture.url} alt={`Strana ${capture.face}`} />
-        ))}
-      </div>
+      {captures.length > 0 ? (
+        <div className="camera-thumbs">
+          {captures.map((capture) => (
+            <img key={capture.face} src={capture.url} alt={`Strana ${capture.face}`} />
+          ))}
+        </div>
+      ) : null}
       <div className="solver-actions">
         <button className="button" onClick={captureFrame} type="button" disabled={!!error}>
           Odfotiť a pokračovať

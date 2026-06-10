@@ -158,7 +158,7 @@ export function ManualSolverPanel() {
   );
 }
 
-export function PhotoUploadPanel() {
+export function PhotoUploadPanel({ onFinished }: { onFinished?: () => void } = {}) {
   const [media, setMedia] = useState<{ name: string; url: string; type: "image" | "video" }[]>([]);
   const [activeMediaName, setActiveMediaName] = useState("");
   const [activeFace, setActiveFace] = useState<PyraminxFaceId>("U");
@@ -352,7 +352,20 @@ export function PhotoUploadPanel() {
         </button>
       </div>
       {captureMode === "camera" ? (
-        <CameraCapture onComplete={handleCameraComplete} onSpeak={speakText} />
+        media.length >= 4 ? (
+          <div className="ai-guide primary-guide">
+            <div>
+              <span>AI</span>
+              <h3>Skvelá práca! 🎉</h3>
+              <p>Mám všetky 4 strany. Poď sa pozrieť na riešenie a animovaný návod.</p>
+            </div>
+            <button className="button" onClick={onFinished} type="button">
+              Pokračovať na riešenie ➡️
+            </button>
+          </div>
+        ) : (
+          <CameraCapture onComplete={handleCameraComplete} onSpeak={speakText} />
+        )
       ) : (
       <>
       <div className="capture-guide">

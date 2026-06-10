@@ -471,11 +471,14 @@ h2 {
 }
 
 .camera-frame {
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1;
   background: #0a1f44;
   border-radius: 12px;
+  max-width: 360px;
+  margin: 0 auto;
   overflow: hidden;
   position: relative;
+  width: 100%;
 }
 
 .camera-video {
@@ -520,9 +523,9 @@ h2 {
 }
 
 .camera-thumbs {
-  display: grid;
+  display: flex;
   gap: 8px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  justify-content: center;
 }
 
 .app-shell-mobile {
@@ -680,7 +683,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 8px;
   object-fit: cover;
-  width: 100%;
+  width: 56px;
 }
 
 .capture-guide {
