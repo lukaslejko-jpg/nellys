@@ -600,6 +600,78 @@ h2 {
   }
 }
 
+.app-shell-mobile {
+  margin: 0 auto;
+  max-width: 560px;
+  min-height: 100vh;
+  padding: 14px 14px 28px;
+}
+
+.app-topbar {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.app-topbar-icon {
+  border-radius: 8px;
+  height: 32px;
+  width: 32px;
+}
+
+.app-topbar h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.app-tabbar {
+  background: var(--soft);
+  border-radius: 999px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 14px;
+  padding: 4px;
+}
+
+.app-tab {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 12px 8px;
+}
+
+.app-tab.active {
+  background: var(--navy);
+  color: #ffffff;
+}
+
+.app-tab-content {
+  display: grid;
+  gap: 14px;
+}
+
+.account-details {
+  margin-top: 24px;
+}
+
+.account-details summary {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (min-width: 720px) {
+  .app-shell-mobile {
+    max-width: 640px;
+    padding-top: 28px;
+  }
+}
+
 .solve-guide {
   display: grid;
   gap: 12px;
