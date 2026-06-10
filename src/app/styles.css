@@ -752,24 +752,33 @@ h2 {
   transition: fill 0.2s ease;
 }
 
+.solve-piece {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 0.8;
+}
+
 .solve-mark {
   stroke: var(--navy);
-  stroke-width: 1.2;
+  stroke-width: 1.4;
+  transform-origin: center;
+  transform-box: fill-box;
   animation: solve-pulse 1s ease-in-out infinite;
 }
 
 @keyframes solve-pulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.18); }
+  50% { transform: scale(1.22); }
 }
 
-.solve-arrow {
-  font-size: 40px;
-  position: absolute;
+.solve-mark-arrow {
+  fill: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: var(--navy);
+  stroke-width: 0.6;
 }
-
-.solve-arrow.cw { color: var(--blue); }
-.solve-arrow.ccw { color: var(--red); }
 
 .solve-color-dot {
   border-radius: 50%;
