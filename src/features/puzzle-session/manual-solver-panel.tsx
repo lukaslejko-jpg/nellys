@@ -9,7 +9,7 @@ import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/came
 import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
 type ApiResult =
-  | { ok: true; session: { id: string; status: string; solutionMoves?: string[] | null } }
+  | { ok: true; session: { id: string; status: string; solution?: string[] | null } }
   | { ok: false; code: string; messageSk?: string };
 
 async function computeSolution(): Promise<{ moves: string[] | null; status: string }> {
@@ -28,7 +28,7 @@ async function computeSolution(): Promise<{ moves: string[] | null; status: stri
     const solved = await postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`);
     if (!solved.ok) return { moves: null, status: solved.messageSk ?? "Solver tok sa nepodarilo dokoncit." };
 
-    return { moves: solved.session.solutionMoves ?? [], status: "" };
+    return { moves: solved.session.solution ?? [], status: "" };
   } catch {
     return { moves: null, status: "Poziadavka zlyhala. Skontroluj prihlasenie a databazu." };
   }
