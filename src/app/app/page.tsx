@@ -12,6 +12,7 @@ export default function AppDashboardPage() {
   return (
     <main className="app-shell-mobile">
       <header className="app-topbar">
+        <a className="back-link" href="/">⬅️</a>
         <img src="/icon.svg" alt="" className="app-topbar-icon" />
         <h1>Nellys</h1>
       </header>

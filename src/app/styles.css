@@ -229,6 +229,49 @@ h2 {
   min-height: 136px;
 }
 
+.fun-panel {
+  border-width: 2px;
+  border-radius: 16px;
+  transition: transform 0.15s ease;
+}
+
+.fun-panel:hover {
+  transform: translateY(-2px);
+}
+
+.fun-panel h2 {
+  margin-top: 0;
+}
+
+.fun-panel--blue {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: var(--blue);
+}
+
+.fun-panel--green {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: var(--green);
+}
+
+.fun-panel--yellow {
+  background: rgba(245, 185, 66, 0.12);
+  border-color: var(--yellow);
+}
+
+.back-link {
+  align-items: center;
+  color: var(--blue);
+  display: inline-flex;
+  font-weight: 800;
+  gap: 6px;
+  margin-bottom: 16px;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
 .muted {
   color: var(--muted);
   line-height: 1.45;
@@ -553,6 +596,11 @@ h2 {
   margin: 0;
 }
 
+.app-topbar .back-link {
+  font-size: 22px;
+  margin-bottom: 0;
+}
+
 .app-tabbar {
   background: var(--soft);
   border-radius: 999px;
@@ -623,6 +671,11 @@ h2 {
 .app-topbar h1 {
   font-size: 22px;
   margin: 0;
+}
+
+.app-topbar .back-link {
+  font-size: 22px;
+  margin-bottom: 0;
 }
 
 .app-tabbar {

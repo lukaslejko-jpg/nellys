@@ -16,15 +16,15 @@ export default function HomePage() {
 
       <section className="hero">
         <div>
-          <p className="eyebrow">Deterministicky puzzle solver</p>
+          <p className="eyebrow">🎉 Hravý pomocník pre deti</p>
           <h1>Nellys</h1>
           <p className="lead">
-            Pyraminx solver, ktory nikdy nehada tahy. Manualny vstup,
-            scramble zapis a foto/video nahlad smeruju do overeneho simulatora.
+            Odfoť svoj Pyraminx a Nellys ti hneď ukáže veselý, animovaný návod
+            krok za krokom – jednoducho, rýchlo a so zábavou! 🔺✨
           </p>
           <div className="nav">
-            <Link className="button" href="/auth/register">Vytvorit ucet</Link>
-            <Link className="button secondary" href="/auth/login">Prihlasit sa</Link>
+            <Link className="button" href="/auth/register">Vytvoriť účet 🚀</Link>
+            <Link className="button secondary" href="/auth/login">Prihlásiť sa</Link>
           </div>
         </div>
         <div className="pyraminx-stage" aria-label="Maskot Nellys">
@@ -32,25 +32,25 @@ export default function HomePage() {
             <img src="/icon.svg" alt="Nellys maskot" className="mascot" />
           </div>
           <div className="stage-strip">
-            <span>Manual</span>
-            <span>Simulator</span>
-            <span>Solver</span>
+            <span>📷 Odfoť</span>
+            <span>🤖 Nellys vyrieši</span>
+            <span>✨ Sleduj návod</span>
           </div>
         </div>
       </section>
 
-      <section className="grid" aria-label="Zakladne pravidla">
-        <div className="panel">
-          <h2>Zadaj scramble</h2>
-          <p className="muted">Pouzi zapis ako U R' L B a Nellys ho odsimuluje.</p>
+      <section className="grid" aria-label="Ako to funguje">
+        <div className="panel fun-panel fun-panel--blue">
+          <h2>📷 1. Odfoť ihlan</h2>
+          <p className="muted">Nasmeruj kameru na všetky 4 strany Pyraminxu, Nellys ťa prevedie krok za krokom.</p>
         </div>
-        <div className="panel">
-          <h2>Over stav</h2>
-          <p className="muted">Neisty foto/video vstup musi prejst potvrdenim farieb.</p>
+        <div className="panel fun-panel fun-panel--green">
+          <h2>🤖 2. Nellys premýšľa</h2>
+          <p className="muted">Náš šikovný riešiteľ vypočíta riešenie, ktoré naozaj funguje.</p>
         </div>
-        <div className="panel">
-          <h2>Vyries</h2>
-          <p className="muted">Sekvencia sa zobrazi az po deterministickom overeni.</p>
+        <div className="panel fun-panel fun-panel--yellow">
+          <h2>✨ 3. Animovaný návod</h2>
+          <p className="muted">Sleduj farebné šípky a otáčaj ihlan presne podľa návodu, kým nie je vyriešený!</p>
         </div>
       </section>
     </main>
