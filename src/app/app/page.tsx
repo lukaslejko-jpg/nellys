@@ -26,7 +26,7 @@ export default function AppDashboardPage() {
       </nav>
 
       <section className="app-tab-content">
-        {tab === "scan" ? <PhotoUploadPanel /> : <ManualSolverPanel />}
+        {tab === "scan" ? <PhotoUploadPanel onFinished={() => setTab("solve")} /> : <ManualSolverPanel />}
       </section>
 
       <details className="account-details">
