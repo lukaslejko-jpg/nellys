@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { baseFace, turnCount, type PyraminxMove } from "@/lib/domain/pyraminx/moves";
 
-const FACE_INFO: Record<string, { label: string; vertex: "top" | "left" | "right" | "center" }> = {
-  U: { label: "hornom vrchole", vertex: "top" },
-  u: { label: "malom hornom vrchole", vertex: "top" },
-  L: { label: "ľavom vrchole", vertex: "left" },
-  l: { label: "malom ľavom vrchole", vertex: "left" },
-  R: { label: "pravom vrchole", vertex: "right" },
-  r: { label: "malom pravom vrchole", vertex: "right" },
-  B: { label: "zadnom vrchole", vertex: "center" },
-  b: { label: "malom zadnom vrchole", vertex: "center" }
+const FACE_INFO: Record<string, { label: string; vertex: "top" | "left" | "right" | "center"; color: string }> = {
+  U: { label: "hornom vrchole", vertex: "top", color: "var(--blue)" },
+  u: { label: "malom hornom vrchole", vertex: "top", color: "var(--blue)" },
+  L: { label: "ľavom vrchole", vertex: "left", color: "var(--green)" },
+  l: { label: "malom ľavom vrchole", vertex: "left", color: "var(--green)" },
+  R: { label: "pravom vrchole", vertex: "right", color: "var(--red)" },
+  r: { label: "malom pravom vrchole", vertex: "right", color: "var(--red)" },
+  B: { label: "zadnom vrchole", vertex: "center", color: "var(--purple)" },
+  b: { label: "malom zadnom vrchole", vertex: "center", color: "var(--purple)" }
 };
 
 const SPEEDS = [0.5, 1, 2] as const;
@@ -80,25 +80,24 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
     <div className="solve-guide">
       <div className="solve-stage">
         <svg className="solve-triangle" viewBox="0 0 100 100" aria-hidden="true">
-          <polygon points="50,8 94,88 6,88" />
-          <line x1="50" y1="8" x2="50" y2="88" />
-          <line x1="28" y1="48" x2="72" y2="48" />
-          <line x1="28" y1="48" x2="50" y2="8" />
-          <line x1="72" y1="48" x2="50" y2="8" />
+          <polygon className="solve-face solve-face-top" points="50,8 72,48 28,48" />
+          <polygon className="solve-face solve-face-left" points="28,48 50,88 6,88" />
+          <polygon className="solve-face solve-face-right" points="72,48 94,88 50,88" />
+          <polygon className="solve-face solve-face-center" points="28,48 72,48 50,88" />
           {info?.vertex === "top" ? (
-            <circle className={ccw ? "solve-mark ccw" : "solve-mark cw"} cx="50" cy="14" r="9" />
+            <circle className={ccw ? "solve-mark ccw" : "solve-mark cw"} cx="50" cy="14" r="11" style={{ fill: info.color }} />
           ) : null}
           {info?.vertex === "left" ? (
-            <circle className={ccw ? "solve-mark ccw" : "solve-mark cw"} cx="16" cy="84" r="9" />
+            <circle className={ccw ? "solve-mark ccw" : "solve-mark cw"} cx="16" cy="84" r="11" style={{ fill: info.color }} />
           ) : null}
           {info?.vertex === "right" ? (
-            <circle className={ccw ? "solve-mark ccw" : "solve-mark cw"} cx="84" cy="84" r="9" />
+            <circle className={ccw ? "solve-mark ccw" : "solve-mark cw"} cx="84" cy="84" r="11" style={{ fill: info.color }} />
           ) : null}
           {info?.vertex === "center" ? (
-            <circle className={ccw ? "solve-mark ccw" : "solve-mark cw"} cx="50" cy="60" r="12" />
+            <circle className={ccw ? "solve-mark ccw" : "solve-mark cw"} cx="50" cy="60" r="14" style={{ fill: info.color }} />
           ) : null}
         </svg>
-        <span className="solve-arrow" aria-hidden="true">
+        <span className={ccw ? "solve-arrow ccw" : "solve-arrow cw"} aria-hidden="true">
           {ccw ? "↺" : "↻"}
         </span>
       </div>
@@ -106,7 +105,10 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
       <div className="live-coach" aria-live="polite">
         <small>Krok {stepIndex + 1} z {total}</small>
         <strong>{move}{turnCount(move) === 2 ? " (dvakrat)" : ""}</strong>
-        <p>{describeMove(move)}</p>
+        <p>
+          <span className="solve-color-dot" style={{ background: info?.color }} aria-hidden="true" />
+          {describeMove(move)} {ccw ? "Otáčaj proti smeru hodinových ručičiek (doľava) ↺." : "Otáčaj v smere hodinových ručičiek (doprava) ↻."}
+        </p>
       </div>
 
       <div className="solve-controls">
