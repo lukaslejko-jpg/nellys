@@ -101,9 +101,9 @@ export function ManualSolverPanel() {
   return (
     <div className="manual-solver">
       <div>
-        <h2>Nove riesenie</h2>
+        <h2>Vyrieš to so mnou! 🧩</h2>
         <p className="muted">
-          Manualne vytvor stav cez legalne Pyraminx tahy a spusti solver cez API.
+          Zatlač na "Vypočítať riešenie" a Nellys ti ukáže animovaný návod krok za krokom.
         </p>
       </div>
       <div className="move-pad" aria-label="Legalne Pyraminx tahy">
@@ -162,7 +162,7 @@ export function PhotoUploadPanel() {
   const [media, setMedia] = useState<{ name: string; url: string; type: "image" | "video" }[]>([]);
   const [activeMediaName, setActiveMediaName] = useState("");
   const [activeFace, setActiveFace] = useState<PyraminxFaceId>("U");
-  const [captureMode, setCaptureMode] = useState<"photos" | "video" | "camera">("photos");
+  const [captureMode, setCaptureMode] = useState<"photos" | "video" | "camera">("camera");
   const [coachStep, setCoachStep] = useState(0);
   const [draft, setDraft] = useState<InspectionDraft>(() => createEmptyInspectionDraft());
   const [status, setStatus] = useState("");
@@ -323,10 +323,9 @@ export function PhotoUploadPanel() {
   return (
     <div className="manual-solver">
       <div>
-        <h2>1. Nahraj Pyraminx</h2>
+        <h2>Ukáž mi svoj Pyraminx 🔺</h2>
         <p className="muted">
-          Nellys teraz riesi ihlan Pyraminx. Klasicka Rubikova kocka bude samostatny model,
-          preto zatial fot alebo toc iba Pyraminx.
+          Použi kameru a Nellys ťa krok za krokom prevedie odfotením všetkých 4 strán.
         </p>
       </div>
       <div className="capture-mode three-up" aria-label="Rezim nahratia">
