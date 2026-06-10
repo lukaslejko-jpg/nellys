@@ -1,7 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Nellys">
-  <rect width="128" height="128" rx="24" fill="#172033"/>
-  <path d="M64 16 112 100H16L64 16Z" fill="#f5b833"/>
-  <path d="M64 16 88 58H40L64 16Z" fill="#e23d3d"/>
-  <path d="M40 58h48l24 42H16l24-42Z" fill="#2b6fe8"/>
-  <path d="M64 58 88 100H40l24-42Z" fill="#24a36a"/>
+  <rect width="128" height="128" rx="28" fill="#0a1f44"/>
+  <path d="M64 14 116 104H12L64 14Z" fill="#ffffff"/>
+  <path d="M64 14 90 58H38L64 14Z" fill="#2563eb"/>
+  <path d="M38 58h26l13 23H25l13-23Z" fill="#22c55e"/>
+  <path d="M64 58h26l13 23H51l13-23Z" fill="#ef4444"/>
+  <path d="M51 81h26l13 23H38l13-23Z" fill="#f5b942"/>
+  <circle cx="55" cy="70" r="5" fill="#0a1f44"/>
+  <circle cx="73" cy="70" r="5" fill="#0a1f44"/>
+  <path d="M56 80c3 4 13 4 16 0" stroke="#0a1f44" stroke-width="3" stroke-linecap="round" fill="none"/>
 </svg>

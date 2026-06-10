@@ -5,8 +5,8 @@ export default function HomePage() {
     <main className="shell marketing-shell">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
-          Nellys <span>Pyraminx Solver</span>
+          <img className="brand-mark" src="/icon.svg" alt="" aria-hidden="true" />
+          Nellys <span>Solve Smart. Play Bright.</span>
         </div>
         <nav className="nav" aria-label="Hlavna navigacia">
           <Link className="button secondary" href="/auth/login">Prihlasenie</Link>
@@ -27,12 +27,9 @@ export default function HomePage() {
             <Link className="button secondary" href="/auth/login">Prihlasit sa</Link>
           </div>
         </div>
-        <div className="pyraminx-stage" aria-label="Farebny Pyraminx motiv">
+        <div className="pyraminx-stage" aria-label="Maskot Nellys">
           <div className="pyraminx-object">
-            <span className="facet facet-top" />
-            <span className="facet facet-left" />
-            <span className="facet facet-right" />
-            <span className="facet facet-core" />
+            <img src="/icon.svg" alt="Nellys maskot" className="mascot" />
           </div>
           <div className="stage-strip">
             <span>Manual</span>

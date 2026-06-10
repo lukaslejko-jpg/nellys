@@ -4,11 +4,11 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Nellys",
     short_name: "Nellys",
-    description: "Puzzle Solver for Pyraminx.",
+    description: "Solve Smart. Play Bright. Pyraminx solver s AI sprievodcom pre deti.",
     start_url: "/app",
     display: "standalone",
     background_color: "#f8fafc",
-    theme_color: "#2b6fe8",
+    theme_color: "#2563eb",
     orientation: "portrait",
     icons: [
       {
