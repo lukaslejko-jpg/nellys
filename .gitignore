@@ -35,3 +35,4 @@ Thumbs.db
 # prisma
 prisma/dev.db
 prisma/dev.db-journal
+tsconfig.tsbuildinfo

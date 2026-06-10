@@ -2,16 +2,18 @@
   color-scheme: light;
   --bg: #f6f8fb;
   --panel: #ffffff;
-  --ink: #142033;
+  --ink: #0a1f44;
   --muted: #607086;
   --line: #d8e1ec;
   --soft: #edf3f8;
-  --red: #e23d3d;
-  --green: #25a96d;
-  --blue: #2d6cdf;
-  --yellow: #f4b93a;
-  --navy: #111827;
-  --shadow: 0 18px 42px rgba(20, 32, 51, 0.08);
+  --red: #ef4444;
+  --green: #22c55e;
+  --blue: #2563eb;
+  --yellow: #f5b942;
+  --purple: #7c4dff;
+  --teal: #14b8a6;
+  --navy: #0a1f44;
+  --shadow: 0 18px 42px rgba(10, 31, 68, 0.08);
 }
 
 * {
@@ -85,10 +87,8 @@ h2 {
 }
 
 .brand-mark {
-  background: conic-gradient(from 45deg, var(--red), var(--green), var(--yellow), var(--blue), var(--red));
-  border: 2px solid #ffffff;
   border-radius: 8px;
-  box-shadow: 0 6px 16px rgba(20, 32, 51, 0.18);
+  box-shadow: 0 6px 16px rgba(10, 31, 68, 0.18);
   display: inline-block;
   height: 34px;
   width: 34px;
@@ -191,42 +191,9 @@ h2 {
   width: 100%;
 }
 
-.facet {
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  display: block;
-  position: absolute;
-}
-
-.facet-top {
-  background: var(--yellow);
-  height: 56%;
-  top: 2%;
-  width: 58%;
-}
-
-.facet-left {
-  background: var(--blue);
-  height: 56%;
-  left: 10%;
-  top: 42%;
-  transform: rotate(180deg);
-  width: 58%;
-}
-
-.facet-right {
-  background: var(--green);
-  height: 56%;
-  right: 10%;
-  top: 42%;
-  transform: rotate(180deg);
-  width: 58%;
-}
-
-.facet-core {
-  background: var(--red);
-  height: 34%;
-  top: 35%;
-  width: 36%;
+.mascot {
+  filter: drop-shadow(0 18px 30px rgba(10, 31, 68, 0.18));
+  width: 100%;
 }
 
 .stage-strip {
@@ -492,6 +459,156 @@ h2 {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.capture-mode.three-up {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.camera-capture {
+  display: grid;
+  gap: 12px;
+}
+
+.camera-frame {
+  aspect-ratio: 3 / 4;
+  background: #0a1f44;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.camera-video {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.camera-overlay {
+  height: 100%;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+
+.camera-overlay polygon {
+  fill: rgba(37, 99, 235, 0.12);
+  stroke: var(--yellow);
+  stroke-width: 0.6;
+}
+
+.camera-overlay line {
+  stroke: var(--yellow);
+  stroke-width: 0.4;
+}
+
+.camera-step-badge {
+  background: rgba(10, 31, 68, 0.75);
+  border-radius: 999px;
+  color: #ffffff;
+  font-weight: 800;
+  left: 12px;
+  padding: 4px 10px;
+  position: absolute;
+  top: 12px;
+}
+
+.camera-canvas-hidden {
+  display: none;
+}
+
+.camera-thumbs {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.solve-guide {
+  display: grid;
+  gap: 12px;
+}
+
+.solve-stage {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  padding: 18px;
+  place-items: center;
+  position: relative;
+}
+
+.solve-triangle {
+  max-width: 220px;
+  width: 100%;
+}
+
+.solve-triangle polygon {
+  fill: #eef3fb;
+  stroke: var(--navy);
+  stroke-width: 1.4;
+}
+
+.solve-triangle line {
+  stroke: var(--navy);
+  stroke-width: 0.8;
+}
+
+.solve-mark {
+  fill: var(--yellow);
+  stroke: var(--navy);
+  stroke-width: 1.2;
+  animation: solve-pulse 1s ease-in-out infinite;
+}
+
+@keyframes solve-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+
+.solve-arrow {
+  font-size: 40px;
+  position: absolute;
+}
+
+.solve-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.speed-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.step-jump {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 10px;
+  grid-template-columns: 34px 1fr;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.step-jump.active span {
+  background: var(--blue);
+}
+
+.camera-thumbs img {
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  object-fit: cover;
+  width: 100%;
 }
 
 .capture-guide {

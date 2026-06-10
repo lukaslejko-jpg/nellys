@@ -19,6 +19,8 @@ import { inverseSequence, legalMoves, parseMoveSequence, type PyraminxMove } fro
 import { applyMove, applySequence } from "@/lib/domain/pyraminx/simulator";
 import type { PyraminxState } from "@/lib/domain/pyraminx/state";
 import { createSolvedState, isSolved, serializeState } from "@/lib/domain/pyraminx/state";
+import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/camera-capture";
+import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
 type ApiResult =
   | { ok: true; session: { id: string; status: string; solutionMoves?: string[] | null } }
@@ -143,9 +145,9 @@ export function ManualSolverPanel() {
       </button>
       {status ? <p className="form-status">{status}</p> : null}
       {moves ? (
-        <div className="solution-box">
-          <span>Riesenie</span>
-          <strong>{moves.length > 0 ? moves.join(" ") : "ziadne tahy"}</strong>
+        <div>
+          <h3>2. Animovany navod</h3>
+          <SolveGuide moves={moves as PyraminxMove[]} />
         </div>
       ) : null}
       <details>
@@ -160,14 +162,15 @@ export function PhotoUploadPanel() {
   const [media, setMedia] = useState<{ name: string; url: string; type: "image" | "video" }[]>([]);
   const [activeMediaName, setActiveMediaName] = useState("");
   const [activeFace, setActiveFace] = useState<PyraminxFaceId>("U");
-  const [captureMode, setCaptureMode] = useState<"photos" | "video">("photos");
+  const [captureMode, setCaptureMode] = useState<"photos" | "video" | "camera">("photos");
   const [coachStep, setCoachStep] = useState(0);
   const [draft, setDraft] = useState<InspectionDraft>(() => createEmptyInspectionDraft());
   const [status, setStatus] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
   const validation = validateInspectionDraft(draft);
-  const guide = createInspectionGuide(draft, { mode: captureMode, hasMedia: media.length > 0 });
-  const coachSteps = buildCoachSteps(captureMode, media.length);
+  const guideMode = captureMode === "video" ? "video" : "photos";
+  const guide = createInspectionGuide(draft, { mode: guideMode, hasMedia: media.length > 0 });
+  const coachSteps = buildCoachSteps(guideMode, media.length);
   const currentCoachStep = coachSteps[Math.min(coachStep, coachSteps.length - 1)];
 
   useEffect(() => {
@@ -229,6 +232,35 @@ export function PhotoUploadPanel() {
         ? `Dopln priradenie fotky pre strany: ${result.missingFaces.join(", ")}.`
         : `Dopln este ${result.missingStickers} kontrolnych farieb.`
     );
+  }
+
+  function speakText(text: string) {
+    if (!soundEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "sk-SK";
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function handleCameraComplete(captures: CapturedFace[]) {
+    media.forEach((item) => URL.revokeObjectURL(item.url));
+    const nextMedia = captures.map((capture) => ({
+      name: `kamera-${capture.face}.jpg`,
+      url: capture.url,
+      type: "image" as const
+    }));
+
+    let nextDraft = createEmptyInspectionDraft();
+    captures.forEach((capture) => {
+      nextDraft = assignCaptureMedia(nextDraft, capture.face, `kamera-${capture.face}.jpg`);
+    });
+
+    setMedia(nextMedia);
+    setActiveMediaName(nextMedia[0]?.name ?? "");
+    setDraft(nextDraft);
+    setCoachStep(0);
+    setStatus("Super, vsetky 4 strany su odfotene! Teraz oznac farby v rucnej kontrole nizsie.");
   }
 
   function speakGuide() {
@@ -297,7 +329,14 @@ export function PhotoUploadPanel() {
           preto zatial fot alebo toc iba Pyraminx.
         </p>
       </div>
-      <div className="capture-mode" aria-label="Rezim nahratia">
+      <div className="capture-mode three-up" aria-label="Rezim nahratia">
+        <button
+          className={captureMode === "camera" ? "face-tab active" : "face-tab"}
+          onClick={() => setCaptureMode("camera")}
+          type="button"
+        >
+          Kamera
+        </button>
         <button
           className={captureMode === "photos" ? "face-tab active" : "face-tab"}
           onClick={() => setCaptureMode("photos")}
@@ -313,6 +352,10 @@ export function PhotoUploadPanel() {
           Video
         </button>
       </div>
+      {captureMode === "camera" ? (
+        <CameraCapture onComplete={handleCameraComplete} onSpeak={speakText} />
+      ) : (
+      <>
       <div className="capture-guide">
         <strong>{captureMode === "photos" ? "Ako nafotit ihlan" : "Ako natocit video"}</strong>
         {captureMode === "photos" ? (
@@ -335,6 +378,8 @@ export function PhotoUploadPanel() {
         <span>{captureMode === "photos" ? "Vybrat fotky Pyraminxu" : "Vybrat video Pyraminxu"}</span>
         <input accept="image/*,video/*,.qt,.mov,.mp4" multiple onChange={handleMedia} type="file" />
       </label>
+      </>
+      )}
       {media.length > 0 ? (
         <div className="inspection-workflow">
           <div className="photo-grid">
