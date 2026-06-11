@@ -5,11 +5,11 @@ import { baseFace, turnCount, type PyraminxMove } from "@/lib/domain/pyraminx/mo
 
 type FaceKey = "top" | "left" | "right" | "center";
 
-const FACES: Record<FaceKey, { points: [number, number][]; faceClass: string }> = {
-  top: { points: [[50, 8], [72, 48], [28, 48]], faceClass: "solve-face-top" },
-  left: { points: [[28, 48], [50, 88], [6, 88]], faceClass: "solve-face-left" },
-  right: { points: [[72, 48], [94, 88], [50, 88]], faceClass: "solve-face-right" },
-  center: { points: [[28, 48], [72, 48], [50, 88]], faceClass: "solve-face-center" }
+const FACES: Record<FaceKey, { points: [number, number][]; faceClass: string; labelPos: [number, number]; label: string }> = {
+  top: { points: [[50, 8], [72, 48], [28, 48]], faceClass: "solve-face-top", labelPos: [50, 30], label: "HORE" },
+  left: { points: [[28, 48], [50, 88], [6, 88]], faceClass: "solve-face-left", labelPos: [28, 70], label: "VĽAVO" },
+  right: { points: [[72, 48], [94, 88], [50, 88]], faceClass: "solve-face-right", labelPos: [72, 70], label: "VPRAVO" },
+  center: { points: [[28, 48], [72, 48], [50, 88]], faceClass: "solve-face-center", labelPos: [50, 65], label: "VZADU (k tebe)" }
 };
 
 const FACE_INFO: Record<string, { label: string; face: FaceKey; vertexIdx: number; color: string }> = {
@@ -117,6 +117,9 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
 
   return (
     <div className="solve-guide">
+      <p className="solve-orientation-hint">
+        Drž pyraminx tak, aby jeden vrchol smeroval hore a jedna stena bola otočená priamo k tebe (VZADU).
+      </p>
       <div className="solve-stage">
         <svg className="solve-triangle" viewBox="0 0 100 100" aria-hidden="true">
           {(Object.keys(FACES) as FaceKey[]).map((key) => {
@@ -132,6 +135,9 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
                 {subdivisionLines(face.points).map(([p1, p2], idx) => (
                   <line key={idx} className="solve-piece-line" x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} />
                 ))}
+                <text x={face.labelPos[0]} y={face.labelPos[1]} className="solve-face-label" textAnchor="middle">
+                  {face.label}
+                </text>
               </g>
             );
           })}
