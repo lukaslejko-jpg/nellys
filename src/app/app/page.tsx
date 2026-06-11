@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { SessionSummary } from "@/features/auth/session-summary";
 import { ManualSolverPanel, PhotoUploadPanel } from "@/features/puzzle-session/manual-solver-panel";
 
@@ -12,7 +13,7 @@ export default function AppDashboardPage() {
   return (
     <main className="app-shell-mobile">
       <header className="app-topbar">
-        <a className="back-link" href="/">⬅️</a>
+        <Link className="back-link" href="/">⬅️</Link>
         <img src="/icon.svg" alt="" className="app-topbar-icon" />
         <h1>Nellys</h1>
       </header>

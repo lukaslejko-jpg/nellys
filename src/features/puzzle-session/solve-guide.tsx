@@ -111,7 +111,6 @@ export function SolveGuide({
   const baseState = initialState ?? createSolvedState();
   const stateAtStep = useMemo(
     () => applySequence(baseState, moves.slice(0, stepIndex)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [baseState, moves, stepIndex]
   );
 
