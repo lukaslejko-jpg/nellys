@@ -758,7 +758,14 @@ h2 {
   stroke-width: 0.8;
 }
 
+.solve-face-active {
+  fill-opacity: 0.32;
+  stroke: var(--navy);
+  stroke-width: 1.4;
+}
+
 .solve-mark {
+  fill-opacity: 0.85;
   stroke: var(--navy);
   stroke-width: 1.4;
   transform-origin: center;
@@ -773,11 +780,11 @@ h2 {
 
 .solve-mark-arrow {
   fill: #ffffff;
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 800;
   paint-order: stroke;
   stroke: var(--navy);
-  stroke-width: 0.6;
+  stroke-width: 1;
 }
 
 .solve-color-dot {
