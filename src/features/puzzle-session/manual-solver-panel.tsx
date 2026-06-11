@@ -4,7 +4,7 @@ import { useState } from "react";
 import { deterministicScramble } from "@/lib/domain/pyraminx/fixtures";
 import type { PyraminxMove } from "@/lib/domain/pyraminx/moves";
 import { applySequence } from "@/lib/domain/pyraminx/simulator";
-import { createSolvedState } from "@/lib/domain/pyraminx/state";
+import { createSolvedState, type PyraminxState } from "@/lib/domain/pyraminx/state";
 import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/camera-capture";
 import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
@@ -12,31 +12,32 @@ type ApiResult =
   | { ok: true; session: { id: string; status: string; solution?: string[] | null } }
   | { ok: false; code: string; messageSk?: string };
 
-async function computeSolution(): Promise<{ moves: string[] | null; status: string }> {
-  try {
-    const scramble = deterministicScramble(20260609, 9);
-    const state = applySequence(createSolvedState(), scramble);
+async function computeSolution(): Promise<{ moves: string[] | null; state: PyraminxState; status: string }> {
+  const scramble = deterministicScramble(20260609, 9);
+  const state = applySequence(createSolvedState(), scramble);
 
+  try {
     const created = await postJson<ApiResult>("/api/puzzle-sessions");
-    if (!created.ok) return { moves: null, status: created.messageSk ?? "Session sa nepodarilo vytvorit." };
+    if (!created.ok) return { moves: null, state, status: created.messageSk ?? "Session sa nepodarilo vytvorit." };
 
     const saved = await putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, {
       correctedState: state
     });
-    if (!saved.ok) return { moves: null, status: saved.messageSk ?? "Stav sa nepodarilo ulozit." };
+    if (!saved.ok) return { moves: null, state, status: saved.messageSk ?? "Stav sa nepodarilo ulozit." };
 
     const solved = await postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`);
-    if (!solved.ok) return { moves: null, status: solved.messageSk ?? "Solver tok sa nepodarilo dokoncit." };
+    if (!solved.ok) return { moves: null, state, status: solved.messageSk ?? "Solver tok sa nepodarilo dokoncit." };
 
-    return { moves: solved.session.solution ?? [], status: "" };
+    return { moves: solved.session.solution ?? [], state, status: "" };
   } catch {
-    return { moves: null, status: "Poziadavka zlyhala. Skontroluj prihlasenie a databazu." };
+    return { moves: null, state, status: "Poziadavka zlyhala. Skontroluj prihlasenie a databazu." };
   }
 }
 
 export function ManualSolverPanel() {
   const [status, setStatus] = useState("");
   const [moves, setMoves] = useState<string[] | null>(null);
+  const [scrambleState, setScrambleState] = useState<PyraminxState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function runSolverFlow() {
@@ -45,6 +46,7 @@ export function ManualSolverPanel() {
     setMoves(null);
     const result = await computeSolution();
     setMoves(result.moves);
+    setScrambleState(result.state);
     setStatus(result.status);
     setIsSubmitting(false);
   }
@@ -61,7 +63,7 @@ export function ManualSolverPanel() {
         {isSubmitting ? "Pocitam..." : "Vypocitat riesenie"}
       </button>
       {status ? <p className="form-status">{status}</p> : null}
-      {moves ? <SolveGuide moves={moves as PyraminxMove[]} /> : null}
+      {moves && scrambleState ? <SolveGuide moves={moves as PyraminxMove[]} initialState={scrambleState} /> : null}
     </div>
   );
 }
@@ -69,6 +71,7 @@ export function ManualSolverPanel() {
 export function PhotoUploadPanel({ onFinished }: { onFinished?: () => void } = {}) {
   const [media, setMedia] = useState<{ name: string; url: string }[]>([]);
   const [moves, setMoves] = useState<string[] | null>(null);
+  const [scrambleState, setScrambleState] = useState<PyraminxState | null>(null);
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -89,6 +92,7 @@ export function PhotoUploadPanel({ onFinished }: { onFinished?: () => void } = {
     setStatus("");
     const result = await computeSolution();
     setMoves(result.moves);
+    setScrambleState(result.state);
     setStatus(result.status);
     setIsSubmitting(false);
   }
@@ -123,9 +127,9 @@ export function PhotoUploadPanel({ onFinished }: { onFinished?: () => void } = {
           </div>
           {isSubmitting ? <p className="form-status">Pocitam riesenie...</p> : null}
           {status ? <p className="form-status">{status}</p> : null}
-          {moves ? (
+          {moves && scrambleState ? (
             <>
-              <SolveGuide moves={moves as PyraminxMove[]} />
+              <SolveGuide moves={moves as PyraminxMove[]} initialState={scrambleState} />
               {onFinished ? (
                 <button className="button" onClick={onFinished} type="button">
                   Pokračovať na riešenie ➡️
