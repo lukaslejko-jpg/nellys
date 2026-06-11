@@ -752,14 +752,27 @@ h2 {
   transition: fill 0.2s ease;
 }
 
-.solve-face-active {
-  fill-opacity: 0.45;
+.solve-piece {
+  stroke: var(--navy);
+  stroke-width: 0.6;
+  stroke-opacity: 0.4;
+}
+
+.solve-face-outline {
+  fill: none;
+  stroke: var(--navy);
+  stroke-width: 1.4;
+}
+
+.solve-face-outline-active {
+  stroke: var(--ink);
+  stroke-width: 3;
   animation: solve-face-pulse 1s ease-in-out infinite;
 }
 
 @keyframes solve-face-pulse {
-  0%, 100% { fill-opacity: 0.45; }
-  50% { fill-opacity: 0.2; }
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.35; }
 }
 
 .solve-orientation-hint {
@@ -780,12 +793,6 @@ h2 {
   letter-spacing: 0.3px;
   pointer-events: none;
   text-transform: uppercase;
-}
-
-.solve-piece-line {
-  stroke: var(--navy);
-  stroke-opacity: 0.25;
-  stroke-width: 0.6;
 }
 
 .solve-piece-active {

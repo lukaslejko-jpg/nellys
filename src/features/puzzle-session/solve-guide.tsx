@@ -1,56 +1,75 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { baseFace, turnCount, type PyraminxMove } from "@/lib/domain/pyraminx/moves";
+import { applySequence } from "@/lib/domain/pyraminx/simulator";
+import { createSolvedState, type PyraminxState } from "@/lib/domain/pyraminx/state";
+import { faceStickerColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
 
 type FaceKey = "top" | "left" | "right" | "center";
 
-const FACES: Record<FaceKey, { points: [number, number][]; faceClass: string; labelPos: [number, number]; label: string }> = {
-  top: { points: [[50, 8], [72, 48], [28, 48]], faceClass: "solve-face-top", labelPos: [50, 30], label: "HORE" },
-  left: { points: [[28, 48], [50, 88], [6, 88]], faceClass: "solve-face-left", labelPos: [28, 70], label: "VĽAVO" },
-  right: { points: [[72, 48], [94, 88], [50, 88]], faceClass: "solve-face-right", labelPos: [72, 70], label: "VPRAVO" },
-  center: { points: [[28, 48], [72, 48], [50, 88]], faceClass: "solve-face-center", labelPos: [50, 65], label: "VZADU (k tebe)" }
+const FACES: Record<
+  FaceKey,
+  { points: [number, number][]; apexIdx: number; faceId: FaceId; labelPos: [number, number]; label: string }
+> = {
+  top: { points: [[50, 8], [72, 48], [28, 48]], apexIdx: 0, faceId: "U", labelPos: [50, 30], label: "HORE" },
+  left: { points: [[28, 48], [50, 88], [6, 88]], apexIdx: 2, faceId: "L", labelPos: [28, 70], label: "VĽAVO" },
+  right: { points: [[72, 48], [94, 88], [50, 88]], apexIdx: 1, faceId: "R", labelPos: [72, 70], label: "VPRAVO" },
+  center: { points: [[28, 48], [72, 48], [50, 88]], apexIdx: 2, faceId: "B", labelPos: [50, 65], label: "VZADU (k tebe)" }
 };
 
-const FACE_INFO: Record<string, { label: string; face: FaceKey; vertexIdx: number; color: string }> = {
-  U: { label: "hornom vrchole", face: "top", vertexIdx: 0, color: "var(--blue)" },
-  u: { label: "malom hornom vrchole", face: "top", vertexIdx: 0, color: "var(--blue)" },
-  L: { label: "ľavom vrchole", face: "left", vertexIdx: 2, color: "var(--green)" },
-  l: { label: "malom ľavom vrchole", face: "left", vertexIdx: 2, color: "var(--green)" },
-  R: { label: "pravom vrchole", face: "right", vertexIdx: 1, color: "var(--red)" },
-  r: { label: "malom pravom vrchole", face: "right", vertexIdx: 1, color: "var(--red)" },
-  B: { label: "zadnom vrchole", face: "center", vertexIdx: 2, color: "var(--purple)" },
-  b: { label: "malom zadnom vrchole", face: "center", vertexIdx: 2, color: "var(--purple)" }
+const FACE_INFO: Record<string, { label: string; face: FaceKey; color: string }> = {
+  U: { label: "hornom vrchole", face: "top", color: "var(--blue)" },
+  u: { label: "malom hornom vrchole", face: "top", color: "var(--blue)" },
+  L: { label: "ľavom vrchole", face: "left", color: "var(--green)" },
+  l: { label: "malom ľavom vrchole", face: "left", color: "var(--green)" },
+  R: { label: "pravom vrchole", face: "right", color: "var(--red)" },
+  r: { label: "malom pravom vrchole", face: "right", color: "var(--red)" },
+  B: { label: "zadnom vrchole", face: "center", color: "var(--purple)" },
+  b: { label: "malom zadnom vrchole", face: "center", color: "var(--purple)" }
 };
 
-function lerp(p: [number, number], q: [number, number], t: number): [number, number] {
-  return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+function gridPoint(
+  a: [number, number],
+  b: [number, number],
+  c: [number, number],
+  i: number,
+  j: number
+): [number, number] {
+  const w0 = 1 - i / 3 - j / 3;
+  const w1 = i / 3;
+  const w2 = j / 3;
+  return [a[0] * w0 + b[0] * w1 + c[0] * w2, a[1] * w0 + b[1] * w1 + c[1] * w2];
 }
 
-// 6 segments that split a triangular face into 9 small pieces, like a real Pyraminx face.
-function subdivisionLines(points: [number, number][]): [[number, number], [number, number]][] {
-  const lines: [[number, number], [number, number]][] = [];
-  for (let i = 0; i < 3; i++) {
-    const apex = points[i];
-    const v1 = points[(i + 1) % 3];
-    const v2 = points[(i + 2) % 3];
-    lines.push([lerp(apex, v1, 1 / 3), lerp(apex, v2, 1 / 3)]);
-    lines.push([lerp(apex, v1, 2 / 3), lerp(apex, v2, 2 / 3)]);
-  }
-  return lines;
+// Splits a triangular face into 9 small triangles, like a real Pyraminx face.
+// Cell 0 is the apex corner; the layout follows faceStickerColors' indexing.
+function subdivideFace(points: [number, number][], apexIdx: number): [number, number][][] {
+  const a = points[apexIdx];
+  const [b, c] = [0, 1, 2].filter((i) => i !== apexIdx).map((i) => points[i]);
+  const g = (i: number, j: number) => gridPoint(a, b, c, i, j);
+
+  const cells: [number, number][][] = new Array(9);
+  cells[0] = [g(0, 0), g(1, 0), g(0, 1)];
+  cells[1] = [g(1, 0), g(2, 0), g(1, 1)];
+  cells[2] = [g(1, 0), g(0, 1), g(1, 1)];
+  cells[3] = [g(0, 1), g(1, 1), g(0, 2)];
+  cells[4] = [g(2, 0), g(3, 0), g(2, 1)];
+  cells[5] = [g(1, 1), g(0, 2), g(1, 2)];
+  cells[6] = [g(1, 1), g(2, 1), g(1, 2)];
+  cells[7] = [g(2, 0), g(1, 1), g(2, 1)];
+  cells[8] = [g(0, 2), g(1, 2), g(0, 3)];
+  return cells;
 }
 
-// The small corner piece (1 of 9) at the given vertex of a face.
-function cornerPiece(points: [number, number][], vertexIdx: number) {
-  const apex = points[vertexIdx];
-  const v1 = points[(vertexIdx + 1) % 3];
-  const v2 = points[(vertexIdx + 2) % 3];
-  const corners = [apex, lerp(apex, v1, 1 / 3), lerp(apex, v2, 1 / 3)];
-  const centroid: [number, number] = [
-    (corners[0][0] + corners[1][0] + corners[2][0]) / 3,
-    (corners[0][1] + corners[1][1] + corners[2][1]) / 3
-  ];
-  return { pointsAttr: corners.map(([x, y]) => `${x},${y}`).join(" "), centroid };
+function centroid(points: [number, number][]): [number, number] {
+  const x = points.reduce((sum, [px]) => sum + px, 0) / points.length;
+  const y = points.reduce((sum, [, py]) => sum + py, 0) / points.length;
+  return [x, y];
+}
+
+function pointsAttr(points: [number, number][]): string {
+  return points.map(([x, y]) => `${x},${y}`).join(" ");
 }
 
 const SPEEDS = [0.5, 1, 2] as const;
@@ -63,7 +82,15 @@ export function describeMove(move: PyraminxMove): string {
   return `Otoč ${info.label} ${direction}.`;
 }
 
-export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?: (text: string) => void }) {
+export function SolveGuide({
+  moves,
+  initialState,
+  onSpeak
+}: {
+  moves: PyraminxMove[];
+  initialState?: PyraminxState;
+  onSpeak?: (text: string) => void;
+}) {
   const [stepIndex, setStepIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
@@ -72,6 +99,13 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
   const move = moves[stepIndex];
   const info = move ? FACE_INFO[baseFace(move)] : undefined;
   const ccw = move?.endsWith("'") ?? false;
+
+  const baseState = initialState ?? createSolvedState();
+  const stateAtStep = useMemo(
+    () => applySequence(baseState, moves.slice(0, stepIndex)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseState, moves, stepIndex]
+  );
 
   useEffect(() => {
     setStepIndex(0);
@@ -125,43 +159,38 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
           {(Object.keys(FACES) as FaceKey[]).map((key) => {
             const face = FACES[key];
             const isActive = info?.face === key;
+            const cells = subdivideFace(face.points, face.apexIdx);
+            const cellColors = faceStickerColors(stateAtStep, face.faceId);
             return (
               <g key={key}>
-                <polygon
-                  className={isActive ? "solve-face solve-face-active" : "solve-face"}
-                  points={face.points.map(([x, y]) => `${x},${y}`).join(" ")}
-                  style={isActive ? { fill: info!.color } : undefined}
-                />
-                {subdivisionLines(face.points).map(([p1, p2], idx) => (
-                  <line key={idx} className="solve-piece-line" x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} />
+                {cells.map((cell, idx) => (
+                  <polygon key={idx} className="solve-piece" points={pointsAttr(cell)} style={{ fill: cellColors[idx] }} />
                 ))}
+                <polygon
+                  className={isActive ? "solve-face-outline solve-face-outline-active" : "solve-face-outline"}
+                  points={pointsAttr(face.points)}
+                />
+                {isActive ? (
+                  <>
+                    <polygon className="solve-piece-active" points={pointsAttr(cells[0])} />
+                    <text
+                      x={centroid(cells[0])[0]}
+                      y={centroid(cells[0])[1]}
+                      className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      style={{ transformOrigin: `${centroid(cells[0])[0]}px ${centroid(cells[0])[1]}px` }}
+                    >
+                      {ccw ? "↺" : "↻"}
+                    </text>
+                  </>
+                ) : null}
                 <text x={face.labelPos[0]} y={face.labelPos[1]} className="solve-face-label" textAnchor="middle">
                   {face.label}
                 </text>
               </g>
             );
           })}
-          {info ? (
-            (() => {
-              const facePoints = FACES[info.face].points;
-              const { pointsAttr, centroid } = cornerPiece(facePoints, info.vertexIdx);
-              return (
-                <>
-                  <polygon className="solve-piece-active" points={pointsAttr} />
-                  <text
-                    x={centroid[0]}
-                    y={centroid[1]}
-                    className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    style={{ transformOrigin: `${centroid[0]}px ${centroid[1]}px` }}
-                  >
-                    {ccw ? "↺" : "↻"}
-                  </text>
-                </>
-              );
-            })()
-          ) : null}
         </svg>
       </div>
 
