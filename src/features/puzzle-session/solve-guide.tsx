@@ -12,28 +12,16 @@ const FACES: Record<FaceKey, { points: [number, number][]; faceClass: string }> 
   center: { points: [[28, 48], [72, 48], [50, 88]], faceClass: "solve-face-center" }
 };
 
-const FACE_INFO: Record<string, { label: string; face: FaceKey; vertexIdx: number; color: string }> = {
-  U: { label: "hornom vrchole", face: "top", vertexIdx: 0, color: "var(--blue)" },
-  u: { label: "malom hornom vrchole", face: "top", vertexIdx: 0, color: "var(--blue)" },
-  L: { label: "ľavom vrchole", face: "left", vertexIdx: 2, color: "var(--green)" },
-  l: { label: "malom ľavom vrchole", face: "left", vertexIdx: 2, color: "var(--green)" },
-  R: { label: "pravom vrchole", face: "right", vertexIdx: 1, color: "var(--red)" },
-  r: { label: "malom pravom vrchole", face: "right", vertexIdx: 1, color: "var(--red)" },
-  B: { label: "zadnom vrchole", face: "center", vertexIdx: 2, color: "var(--purple)" },
-  b: { label: "malom zadnom vrchole", face: "center", vertexIdx: 2, color: "var(--purple)" }
+const FACE_INFO: Record<string, { label: string; face: FaceKey; color: string }> = {
+  U: { label: "hornom vrchole", face: "top", color: "var(--blue)" },
+  u: { label: "malom hornom vrchole", face: "top", color: "var(--blue)" },
+  L: { label: "ľavom vrchole", face: "left", color: "var(--green)" },
+  l: { label: "malom ľavom vrchole", face: "left", color: "var(--green)" },
+  R: { label: "pravom vrchole", face: "right", color: "var(--red)" },
+  r: { label: "malom pravom vrchole", face: "right", color: "var(--red)" },
+  B: { label: "zadnom vrchole", face: "center", color: "var(--purple)" },
+  b: { label: "malom zadnom vrchole", face: "center", color: "var(--purple)" }
 };
-
-// Returns a small corner triangle (scaled toward `vertexIdx`) plus its centroid,
-// used to highlight the single tip piece a move rotates.
-function cornerPiece(points: [number, number][], vertexIdx: number, scale = 0.42) {
-  const v = points[vertexIdx];
-  const corners = points.map(([x, y]) => [v[0] + (x - v[0]) * scale, v[1] + (y - v[1]) * scale] as [number, number]);
-  const centroid: [number, number] = [
-    (corners[0][0] + corners[1][0] + corners[2][0]) / 3,
-    (corners[0][1] + corners[1][1] + corners[2][1]) / 3
-  ];
-  return { pointsAttr: corners.map(([x, y]) => `${x},${y}`).join(" "), centroid };
-}
 
 const SPEEDS = [0.5, 1, 2] as const;
 
@@ -103,38 +91,34 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
         <svg className="solve-triangle" viewBox="0 0 100 100" aria-hidden="true">
           {(Object.keys(FACES) as FaceKey[]).map((key) => {
             const face = FACES[key];
-            const corners = [0, 1, 2].map((idx) => cornerPiece(face.points, idx).pointsAttr);
+            const isActive = info?.face === key;
             return (
-              <g key={key}>
-                <polygon className={`solve-face ${face.faceClass}`} points={face.points.map(([x, y]) => `${x},${y}`).join(" ")} />
-                {corners.map((pts, idx) => (
-                  <polygon key={idx} className="solve-piece" points={pts} />
-                ))}
-              </g>
+              <polygon
+                key={key}
+                className={isActive ? "solve-face solve-face-active" : "solve-face"}
+                points={face.points.map(([x, y]) => `${x},${y}`).join(" ")}
+                style={isActive ? { fill: info!.color } : undefined}
+              />
             );
           })}
           {info ? (
             (() => {
               const facePoints = FACES[info.face].points;
-              const { pointsAttr, centroid } = cornerPiece(facePoints, info.vertexIdx, 0.52);
+              const faceCentroid: [number, number] = [
+                (facePoints[0][0] + facePoints[1][0] + facePoints[2][0]) / 3,
+                (facePoints[0][1] + facePoints[1][1] + facePoints[2][1]) / 3
+              ];
               return (
-                <>
-                  <polygon
-                    className={ccw ? "solve-mark ccw" : "solve-mark cw"}
-                    points={pointsAttr}
-                    style={{ fill: info.color }}
-                  />
-                  <text
-                    x={centroid[0]}
-                    y={centroid[1]}
-                    className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    style={{ transformOrigin: `${centroid[0]}px ${centroid[1]}px` }}
-                  >
-                    {ccw ? "↺" : "↻"}
-                  </text>
-                </>
+                <text
+                  x={faceCentroid[0]}
+                  y={faceCentroid[1]}
+                  className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  style={{ transformOrigin: `${faceCentroid[0]}px ${faceCentroid[1]}px` }}
+                >
+                  {ccw ? "↺" : "↻"}
+                </text>
               );
             })()
           ) : null}
@@ -146,8 +130,7 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
         <strong>{move}{turnCount(move) === 2 ? " (dvakrat)" : ""}</strong>
         <p>
           <span className="solve-color-dot" style={{ background: info?.color }} aria-hidden="true" />
-          Chyť <strong>iba malú vyznačenú špičku</strong> (farebný trojuholník s otočenou šípkou) – nie celú stranu.
-          {" "}{describeMove(move)} {ccw ? "Otáčaj proti smeru hodinových ručičiek (doľava) ↺." : "Otáčaj v smere hodinových ručičiek (doprava) ↻."}
+          {describeMove(move)} {ccw ? "Otáčaj proti smeru hodinových ručičiek (doľava) ↺." : "Otáčaj v smere hodinových ručičiek (doprava) ↻."}
         </p>
       </div>
 
