@@ -122,14 +122,47 @@ async function analyzeWithOpenAi(apiKey: string, dataUrl: string): Promise<Analy
   return parseColors(text);
 }
 
+async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: string): Promise<AnalyzeFaceResult> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: PROMPT }, { inline_data: { mime_type: mediaType, data: base64Data } }]
+            }
+          ]
+        })
+      }
+    );
+  } catch {
+    return { ok: false, messageSk: "Nepodarilo sa spojiť s AI rozpoznávaním fotiek." };
+  }
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (Gemini ${response.status}): ${errText.slice(0, 200)}` };
+  }
+
+  const body = (await response.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  const text = body.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+  return parseColors(text);
+}
+
 /**
  * Sends one face photo (data URL) to an AI vision model and returns the 9 sticker colors
- * in the cell order described in `PROMPT`. Uses Anthropic if configured, otherwise OpenAI.
+ * in the cell order described in `PROMPT`. Tries Anthropic, then OpenAI, then Gemini,
+ * falling through to the next provider if one fails.
  */
 export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResult> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openAiKey = process.env.OPENAI_API_KEY;
-  if (!anthropicKey && !openAiKey) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!anthropicKey && !openAiKey && !geminiKey) {
     return { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
   }
 
@@ -139,10 +172,20 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
   }
   const [, mediaType, base64Data] = match;
 
+  let result: AnalyzeFaceResult = { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
+
   if (anthropicKey) {
-    const result = await analyzeWithAnthropic(anthropicKey, mediaType, base64Data);
-    if (result.ok || !openAiKey) return result;
-    return analyzeWithOpenAi(openAiKey, dataUrl);
+    result = await analyzeWithAnthropic(anthropicKey, mediaType, base64Data);
+    if (result.ok) return result;
   }
-  return analyzeWithOpenAi(openAiKey!, dataUrl);
+  if (openAiKey) {
+    result = await analyzeWithOpenAi(openAiKey, dataUrl);
+    if (result.ok) return result;
+  }
+  if (geminiKey) {
+    result = await analyzeWithGemini(geminiKey, mediaType, base64Data);
+    if (result.ok) return result;
+  }
+
+  return result;
 }
