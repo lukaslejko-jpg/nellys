@@ -163,7 +163,7 @@ async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<A
         authorization: `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.2-11b-vision-instruct:free",
+        model: "qwen/qwen2.5-vl-32b-instruct:free",
         max_tokens: 256,
         messages: [
           {
