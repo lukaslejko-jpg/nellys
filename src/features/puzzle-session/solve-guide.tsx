@@ -5,6 +5,14 @@ import { baseFace, turnCount, type PyraminxMove } from "@/lib/domain/pyraminx/mo
 import { applySequence } from "@/lib/domain/pyraminx/simulator";
 import { createSolvedState, type PyraminxState } from "@/lib/domain/pyraminx/state";
 import { faceStickerColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
+import type { StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
+
+const STICKER_COLOR: Record<StickerColorId, string> = {
+  red: "var(--red)",
+  green: "var(--green)",
+  blue: "var(--blue)",
+  yellow: "var(--yellow)"
+};
 
 type FaceKey = "top" | "left" | "right" | "center";
 
@@ -25,8 +33,8 @@ const FACE_INFO: Record<string, { label: string; face: FaceKey; color: string }>
   l: { label: "malom ľavom vrchole", face: "left", color: "var(--green)" },
   R: { label: "pravom vrchole", face: "right", color: "var(--red)" },
   r: { label: "malom pravom vrchole", face: "right", color: "var(--red)" },
-  B: { label: "zadnom vrchole", face: "center", color: "var(--purple)" },
-  b: { label: "malom zadnom vrchole", face: "center", color: "var(--purple)" }
+  B: { label: "zadnom vrchole", face: "center", color: "var(--yellow)" },
+  b: { label: "malom zadnom vrchole", face: "center", color: "var(--yellow)" }
 };
 
 function gridPoint(
@@ -164,7 +172,7 @@ export function SolveGuide({
             return (
               <g key={key}>
                 {cells.map((cell, idx) => (
-                  <polygon key={idx} className="solve-piece" points={pointsAttr(cell)} style={{ fill: cellColors[idx] }} />
+                  <polygon key={idx} className="solve-piece" points={pointsAttr(cell)} style={{ fill: STICKER_COLOR[cellColors[idx]] }} />
                 ))}
                 <polygon
                   className={isActive ? "solve-face-outline solve-face-outline-active" : "solve-face-outline"}
