@@ -753,22 +753,40 @@ h2 {
 }
 
 .solve-face-active {
-  fill-opacity: 1;
+  fill-opacity: 0.45;
   animation: solve-face-pulse 1s ease-in-out infinite;
 }
 
 @keyframes solve-face-pulse {
+  0%, 100% { fill-opacity: 0.45; }
+  50% { fill-opacity: 0.2; }
+}
+
+.solve-piece-line {
+  stroke: var(--navy);
+  stroke-opacity: 0.25;
+  stroke-width: 0.6;
+}
+
+.solve-piece-active {
+  fill: #ffffff;
+  stroke: var(--navy);
+  stroke-width: 1.6;
+  animation: solve-piece-pulse 1s ease-in-out infinite;
+}
+
+@keyframes solve-piece-pulse {
   0%, 100% { fill-opacity: 1; }
-  50% { fill-opacity: 0.6; }
+  50% { fill-opacity: 0.55; }
 }
 
 .solve-mark-arrow {
-  fill: #ffffff;
-  font-size: 26px;
+  fill: var(--navy);
+  font-size: 14px;
   font-weight: 800;
   paint-order: stroke;
-  stroke: var(--navy);
-  stroke-width: 1;
+  stroke: #ffffff;
+  stroke-width: 0.6;
 }
 
 .solve-mark-arrow.cw {

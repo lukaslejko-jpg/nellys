@@ -12,16 +12,46 @@ const FACES: Record<FaceKey, { points: [number, number][]; faceClass: string }> 
   center: { points: [[28, 48], [72, 48], [50, 88]], faceClass: "solve-face-center" }
 };
 
-const FACE_INFO: Record<string, { label: string; face: FaceKey; color: string }> = {
-  U: { label: "hornom vrchole", face: "top", color: "var(--blue)" },
-  u: { label: "malom hornom vrchole", face: "top", color: "var(--blue)" },
-  L: { label: "ľavom vrchole", face: "left", color: "var(--green)" },
-  l: { label: "malom ľavom vrchole", face: "left", color: "var(--green)" },
-  R: { label: "pravom vrchole", face: "right", color: "var(--red)" },
-  r: { label: "malom pravom vrchole", face: "right", color: "var(--red)" },
-  B: { label: "zadnom vrchole", face: "center", color: "var(--purple)" },
-  b: { label: "malom zadnom vrchole", face: "center", color: "var(--purple)" }
+const FACE_INFO: Record<string, { label: string; face: FaceKey; vertexIdx: number; color: string }> = {
+  U: { label: "hornom vrchole", face: "top", vertexIdx: 0, color: "var(--blue)" },
+  u: { label: "malom hornom vrchole", face: "top", vertexIdx: 0, color: "var(--blue)" },
+  L: { label: "ľavom vrchole", face: "left", vertexIdx: 2, color: "var(--green)" },
+  l: { label: "malom ľavom vrchole", face: "left", vertexIdx: 2, color: "var(--green)" },
+  R: { label: "pravom vrchole", face: "right", vertexIdx: 1, color: "var(--red)" },
+  r: { label: "malom pravom vrchole", face: "right", vertexIdx: 1, color: "var(--red)" },
+  B: { label: "zadnom vrchole", face: "center", vertexIdx: 2, color: "var(--purple)" },
+  b: { label: "malom zadnom vrchole", face: "center", vertexIdx: 2, color: "var(--purple)" }
 };
+
+function lerp(p: [number, number], q: [number, number], t: number): [number, number] {
+  return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+}
+
+// 6 segments that split a triangular face into 9 small pieces, like a real Pyraminx face.
+function subdivisionLines(points: [number, number][]): [[number, number], [number, number]][] {
+  const lines: [[number, number], [number, number]][] = [];
+  for (let i = 0; i < 3; i++) {
+    const apex = points[i];
+    const v1 = points[(i + 1) % 3];
+    const v2 = points[(i + 2) % 3];
+    lines.push([lerp(apex, v1, 1 / 3), lerp(apex, v2, 1 / 3)]);
+    lines.push([lerp(apex, v1, 2 / 3), lerp(apex, v2, 2 / 3)]);
+  }
+  return lines;
+}
+
+// The small corner piece (1 of 9) at the given vertex of a face.
+function cornerPiece(points: [number, number][], vertexIdx: number) {
+  const apex = points[vertexIdx];
+  const v1 = points[(vertexIdx + 1) % 3];
+  const v2 = points[(vertexIdx + 2) % 3];
+  const corners = [apex, lerp(apex, v1, 1 / 3), lerp(apex, v2, 1 / 3)];
+  const centroid: [number, number] = [
+    (corners[0][0] + corners[1][0] + corners[2][0]) / 3,
+    (corners[0][1] + corners[1][1] + corners[2][1]) / 3
+  ];
+  return { pointsAttr: corners.map(([x, y]) => `${x},${y}`).join(" "), centroid };
+}
 
 const SPEEDS = [0.5, 1, 2] as const;
 
@@ -93,32 +123,36 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
             const face = FACES[key];
             const isActive = info?.face === key;
             return (
-              <polygon
-                key={key}
-                className={isActive ? "solve-face solve-face-active" : "solve-face"}
-                points={face.points.map(([x, y]) => `${x},${y}`).join(" ")}
-                style={isActive ? { fill: info!.color } : undefined}
-              />
+              <g key={key}>
+                <polygon
+                  className={isActive ? "solve-face solve-face-active" : "solve-face"}
+                  points={face.points.map(([x, y]) => `${x},${y}`).join(" ")}
+                  style={isActive ? { fill: info!.color } : undefined}
+                />
+                {subdivisionLines(face.points).map(([p1, p2], idx) => (
+                  <line key={idx} className="solve-piece-line" x1={p1[0]} y1={p1[1]} x2={p2[0]} y2={p2[1]} />
+                ))}
+              </g>
             );
           })}
           {info ? (
             (() => {
               const facePoints = FACES[info.face].points;
-              const faceCentroid: [number, number] = [
-                (facePoints[0][0] + facePoints[1][0] + facePoints[2][0]) / 3,
-                (facePoints[0][1] + facePoints[1][1] + facePoints[2][1]) / 3
-              ];
+              const { pointsAttr, centroid } = cornerPiece(facePoints, info.vertexIdx);
               return (
-                <text
-                  x={faceCentroid[0]}
-                  y={faceCentroid[1]}
-                  className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  style={{ transformOrigin: `${faceCentroid[0]}px ${faceCentroid[1]}px` }}
-                >
-                  {ccw ? "↺" : "↻"}
-                </text>
+                <>
+                  <polygon className="solve-piece-active" points={pointsAttr} />
+                  <text
+                    x={centroid[0]}
+                    y={centroid[1]}
+                    className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    style={{ transformOrigin: `${centroid[0]}px ${centroid[1]}px` }}
+                  >
+                    {ccw ? "↺" : "↻"}
+                  </text>
+                </>
               );
             })()
           ) : null}
