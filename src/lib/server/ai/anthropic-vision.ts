@@ -153,16 +153,54 @@ async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: 
   return parseColors(text);
 }
 
+async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<AnalyzeFaceResult> {
+  let response: Response;
+  try {
+    response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "meta-llama/llama-3.2-11b-vision-instruct:free",
+        max_tokens: 256,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: PROMPT },
+              { type: "image_url", image_url: { url: dataUrl } }
+            ]
+          }
+        ]
+      })
+    });
+  } catch {
+    return { ok: false, messageSk: "Nepodarilo sa spojiť s AI rozpoznávaním fotiek." };
+  }
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (OpenRouter ${response.status}): ${errText.slice(0, 200)}` };
+  }
+
+  const body = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+  const text = body.choices?.[0]?.message?.content ?? "";
+  return parseColors(text);
+}
+
 /**
  * Sends one face photo (data URL) to an AI vision model and returns the 9 sticker colors
  * in the cell order described in `PROMPT`. Tries Anthropic, then OpenAI, then Gemini,
- * falling through to the next provider if one fails.
+ * then OpenRouter, falling through to the next provider if one fails.
  */
 export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResult> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openAiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (!anthropicKey && !openAiKey && !geminiKey) {
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (!anthropicKey && !openAiKey && !geminiKey && !openRouterKey) {
     return { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
   }
 
@@ -184,6 +222,10 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
   }
   if (geminiKey) {
     result = await analyzeWithGemini(geminiKey, mediaType, base64Data);
+    if (result.ok) return result;
+  }
+  if (openRouterKey) {
+    result = await analyzeWithOpenRouter(openRouterKey, dataUrl);
     if (result.ok) return result;
   }
 
