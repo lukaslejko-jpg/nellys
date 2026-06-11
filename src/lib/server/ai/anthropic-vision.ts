@@ -140,7 +140,9 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
   const [, mediaType, base64Data] = match;
 
   if (anthropicKey) {
-    return analyzeWithAnthropic(anthropicKey, mediaType, base64Data);
+    const result = await analyzeWithAnthropic(anthropicKey, mediaType, base64Data);
+    if (result.ok || !openAiKey) return result;
+    return analyzeWithOpenAi(openAiKey, dataUrl);
   }
   return analyzeWithOpenAi(openAiKey!, dataUrl);
 }
