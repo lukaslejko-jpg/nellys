@@ -33,7 +33,7 @@ function parseColors(text: string): AnalyzeFaceResult {
   const parsed = extractJson(text) as { colors?: unknown } | null;
 
   if (!parsed || !Array.isArray(parsed.colors) || parsed.colors.length !== 9) {
-    return { ok: false, messageSk: "AI nedokázalo rozpoznať farby na fotke. Skús odfotiť stranu znova." };
+    return { ok: false, messageSk: `AI nedokázalo rozpoznať farby na fotke (odpoveď: ${text.slice(0, 200)}).` };
   }
 
   const colors: FaceCellColors = [];
@@ -76,7 +76,8 @@ async function analyzeWithAnthropic(apiKey: string, mediaType: string, base64Dat
   }
 
   if (!response.ok) {
-    return { ok: false, messageSk: "AI rozpoznávanie fotiek zlyhalo." };
+    const errText = await response.text().catch(() => "");
+    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (Anthropic ${response.status}): ${errText.slice(0, 200)}` };
   }
 
   const body = (await response.json()) as { content?: { type: string; text?: string }[] };
@@ -112,7 +113,8 @@ async function analyzeWithOpenAi(apiKey: string, dataUrl: string): Promise<Analy
   }
 
   if (!response.ok) {
-    return { ok: false, messageSk: "AI rozpoznávanie fotiek zlyhalo." };
+    const errText = await response.text().catch(() => "");
+    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (OpenAI ${response.status}): ${errText.slice(0, 200)}` };
   }
 
   const body = (await response.json()) as { choices?: { message?: { content?: string } }[] };
