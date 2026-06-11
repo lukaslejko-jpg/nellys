@@ -752,6 +752,7 @@ h2 {
   transition: fill 0.2s ease;
 }
 
+<<<<<<< HEAD
 .solve-face-active {
   fill-opacity: 1;
   animation: solve-face-pulse 1s ease-in-out infinite;
@@ -760,6 +761,26 @@ h2 {
 @keyframes solve-face-pulse {
   0%, 100% { fill-opacity: 1; }
   50% { fill-opacity: 0.6; }
+=======
+.solve-piece {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 0.8;
+}
+
+.solve-mark {
+  fill-opacity: 0.9;
+  stroke: var(--navy);
+  stroke-width: 1.6;
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: solve-pulse 1s ease-in-out infinite;
+}
+
+@keyframes solve-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+>>>>>>> origin/main
 }
 
 .solve-mark-arrow {
