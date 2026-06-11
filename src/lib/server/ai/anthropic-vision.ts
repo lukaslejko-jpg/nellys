@@ -29,18 +29,25 @@ function extractJson(text: string): unknown {
  * Sends one face photo (data URL) to Claude vision and returns the 9 sticker colors
  * in the cell order described in `PROMPT`.
  */
-export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
+function parseColors(text: string): AnalyzeFaceResult {
+  const parsed = extractJson(text) as { colors?: unknown } | null;
+
+  if (!parsed || !Array.isArray(parsed.colors) || parsed.colors.length !== 9) {
+    return { ok: false, messageSk: "AI nedokázalo rozpoznať farby na fotke. Skús odfotiť stranu znova." };
   }
 
-  const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-  if (!match) {
-    return { ok: false, messageSk: "Fotka má neplatný formát." };
+  const colors: FaceCellColors = [];
+  for (const color of parsed.colors) {
+    if (typeof color !== "string" || !(stickerColorIds as readonly string[]).includes(color)) {
+      return { ok: false, messageSk: "AI vrátilo neznámu farbu. Skús odfotiť stranu znova pri lepšom svetle." };
+    }
+    colors.push(color as StickerColorId);
   }
-  const [, mediaType, base64Data] = match;
 
+  return { ok: true, colors };
+}
+
+async function analyzeWithAnthropic(apiKey: string, mediaType: string, base64Data: string): Promise<AnalyzeFaceResult> {
   let response: Response;
   try {
     response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -74,19 +81,64 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
 
   const body = (await response.json()) as { content?: { type: string; text?: string }[] };
   const text = body.content?.find((block) => block.type === "text")?.text ?? "";
-  const parsed = extractJson(text) as { colors?: unknown } | null;
+  return parseColors(text);
+}
 
-  if (!parsed || !Array.isArray(parsed.colors) || parsed.colors.length !== 9) {
-    return { ok: false, messageSk: "AI nedokázalo rozpoznať farby na fotke. Skús odfotiť stranu znova." };
+async function analyzeWithOpenAi(apiKey: string, dataUrl: string): Promise<AnalyzeFaceResult> {
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        max_tokens: 256,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: PROMPT },
+              { type: "image_url", image_url: { url: dataUrl } }
+            ]
+          }
+        ]
+      })
+    });
+  } catch {
+    return { ok: false, messageSk: "Nepodarilo sa spojiť s AI rozpoznávaním fotiek." };
   }
 
-  const colors: FaceCellColors = [];
-  for (const color of parsed.colors) {
-    if (typeof color !== "string" || !(stickerColorIds as readonly string[]).includes(color)) {
-      return { ok: false, messageSk: "AI vrátilo neznámu farbu. Skús odfotiť stranu znova pri lepšom svetle." };
-    }
-    colors.push(color as StickerColorId);
+  if (!response.ok) {
+    return { ok: false, messageSk: "AI rozpoznávanie fotiek zlyhalo." };
   }
 
-  return { ok: true, colors };
+  const body = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+  const text = body.choices?.[0]?.message?.content ?? "";
+  return parseColors(text);
+}
+
+/**
+ * Sends one face photo (data URL) to an AI vision model and returns the 9 sticker colors
+ * in the cell order described in `PROMPT`. Uses Anthropic if configured, otherwise OpenAI.
+ */
+export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResult> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const openAiKey = process.env.OPENAI_API_KEY;
+  if (!anthropicKey && !openAiKey) {
+    return { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
+  }
+
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+  if (!match) {
+    return { ok: false, messageSk: "Fotka má neplatný formát." };
+  }
+  const [, mediaType, base64Data] = match;
+
+  if (anthropicKey) {
+    return analyzeWithAnthropic(anthropicKey, mediaType, base64Data);
+  }
+  return analyzeWithOpenAi(openAiKey!, dataUrl);
 }
