@@ -4,7 +4,7 @@ import { AuthForm } from "@/features/auth/auth-form";
 export default function RegisterPage() {
   return (
     <main className="shell narrow">
-      <a className="back-link" href="/">⬅️ Domov</a>
+      <Link className="back-link" href="/">⬅️ Domov</Link>
       <section className="panel">
         <p className="eyebrow">Nellys ucet</p>
         <h1>Registracia</h1>

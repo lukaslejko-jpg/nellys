@@ -86,7 +86,7 @@ export function ManualSolverPanel() {
       <div>
         <h2>Vyrieš to so mnou! 🧩</h2>
         <p className="muted">
-          Zatlač na "Vypočítať riešenie" a Nellys ti ukáže animovaný návod krok za krokom.
+          Zatlač na &quot;Vypočítať riešenie&quot; a Nellys ti ukáže animovaný návod krok za krokom.
         </p>
       </div>
       <button className="button" disabled={isSubmitting} onClick={runSolverFlow} type="button">
