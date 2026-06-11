@@ -5,6 +5,7 @@ import { deterministicScramble } from "@/lib/domain/pyraminx/fixtures";
 import type { PyraminxMove } from "@/lib/domain/pyraminx/moves";
 import { applySequence } from "@/lib/domain/pyraminx/simulator";
 import { createSolvedState, type PyraminxState } from "@/lib/domain/pyraminx/state";
+import type { PyraminxFaceId } from "@/lib/domain/pyraminx/media-inspection";
 import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/camera-capture";
 import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
@@ -12,9 +13,38 @@ type ApiResult =
   | { ok: true; session: { id: string; status: string; solution?: string[] | null } }
   | { ok: false; code: string; messageSk?: string };
 
-async function computeSolution(): Promise<{ moves: string[] | null; state: PyraminxState; status: string }> {
-  const scramble = deterministicScramble(20260609, 9);
-  const state = applySequence(createSolvedState(), scramble);
+async function blobUrlToDataUrl(url: string): Promise<string> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function recognizeStateFromPhotos(captures: CapturedFace[]): Promise<{ state: PyraminxState | null; messageSk: string }> {
+  try {
+    const images: Partial<Record<PyraminxFaceId, string>> = {};
+    for (const capture of captures) {
+      images[capture.face] = await blobUrlToDataUrl(capture.url);
+    }
+    const result = await postJson<{ ok: boolean; state?: PyraminxState; messageSk?: string }>(
+      "/api/pyraminx-vision",
+      { images }
+    );
+    if (result.ok && result.state) {
+      return { state: result.state, messageSk: "" };
+    }
+    return { state: null, messageSk: result.messageSk ?? "Rozpoznávanie fotiek zlyhalo." };
+  } catch {
+    return { state: null, messageSk: "Rozpoznávanie fotiek zlyhalo." };
+  }
+}
+
+async function computeSolution(initialState?: PyraminxState): Promise<{ moves: string[] | null; state: PyraminxState; status: string }> {
+  const state = initialState ?? applySequence(createSolvedState(), deterministicScramble(20260609, 9));
 
   try {
     const created = await postJson<ApiResult>("/api/puzzle-sessions");
@@ -90,10 +120,11 @@ export function PhotoUploadPanel({ onFinished }: { onFinished?: () => void } = {
     setMedia(captures.map((capture) => ({ name: `kamera-${capture.face}.jpg`, url: capture.url })));
     setIsSubmitting(true);
     setStatus("");
-    const result = await computeSolution();
+    const recognized = await recognizeStateFromPhotos(captures);
+    const result = await computeSolution(recognized.state ?? undefined);
     setMoves(result.moves);
     setScrambleState(result.state);
-    setStatus(result.status);
+    setStatus(recognized.state ? result.status : (recognized.messageSk || result.status));
     setIsSubmitting(false);
   }
 
@@ -145,8 +176,12 @@ export function PhotoUploadPanel({ onFinished }: { onFinished?: () => void } = {
   );
 }
 
-async function postJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { method: "POST" });
+async function postJson<T>(url: string, body?: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: body !== undefined ? { "content-type": "application/json" } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  });
   return response.json() as Promise<T>;
 }
 
