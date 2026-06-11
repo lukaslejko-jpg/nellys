@@ -116,21 +116,22 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
           {info ? (
             (() => {
               const facePoints = FACES[info.face].points;
-              const faceAttr = facePoints.map(([x, y]) => `${x},${y}`).join(" ");
-              const faceCentroid: [number, number] = [
-                (facePoints[0][0] + facePoints[1][0] + facePoints[2][0]) / 3,
-                (facePoints[0][1] + facePoints[1][1] + facePoints[2][1]) / 3
-              ];
-              const { pointsAttr } = cornerPiece(facePoints, info.vertexIdx);
+              const { pointsAttr, centroid } = cornerPiece(facePoints, info.vertexIdx, 0.52);
               return (
                 <>
-                  <polygon className="solve-face-active" points={faceAttr} style={{ fill: info.color }} />
                   <polygon
                     className={ccw ? "solve-mark ccw" : "solve-mark cw"}
                     points={pointsAttr}
                     style={{ fill: info.color }}
                   />
-                  <text x={faceCentroid[0]} y={faceCentroid[1]} className="solve-mark-arrow" textAnchor="middle" dominantBaseline="central">
+                  <text
+                    x={centroid[0]}
+                    y={centroid[1]}
+                    className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    style={{ transformOrigin: `${centroid[0]}px ${centroid[1]}px` }}
+                  >
                     {ccw ? "↺" : "↻"}
                   </text>
                 </>
@@ -145,7 +146,8 @@ export function SolveGuide({ moves, onSpeak }: { moves: PyraminxMove[]; onSpeak?
         <strong>{move}{turnCount(move) === 2 ? " (dvakrat)" : ""}</strong>
         <p>
           <span className="solve-color-dot" style={{ background: info?.color }} aria-hidden="true" />
-          {describeMove(move)} {ccw ? "Otáčaj proti smeru hodinových ručičiek (doľava) ↺." : "Otáčaj v smere hodinových ručičiek (doprava) ↻."}
+          Chyť <strong>iba malú vyznačenú špičku</strong> (farebný trojuholník s otočenou šípkou) – nie celú stranu.
+          {" "}{describeMove(move)} {ccw ? "Otáčaj proti smeru hodinových ručičiek (doľava) ↺." : "Otáčaj v smere hodinových ručičiek (doprava) ↻."}
         </p>
       </div>
 
