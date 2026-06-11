@@ -25,10 +25,6 @@ function extractJson(text: string): unknown {
   }
 }
 
-/**
- * Sends one face photo (data URL) to Claude vision and returns the 9 sticker colors
- * in the cell order described in `PROMPT`.
- */
 function parseColors(text: string): AnalyzeFaceResult {
   const parsed = extractJson(text) as { colors?: unknown } | null;
 
@@ -45,81 +41,6 @@ function parseColors(text: string): AnalyzeFaceResult {
   }
 
   return { ok: true, colors };
-}
-
-async function analyzeWithAnthropic(apiKey: string, mediaType: string, base64Data: string): Promise<AnalyzeFaceResult> {
-  let response: Response;
-  try {
-    response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 256,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: mediaType, data: base64Data } },
-              { type: "text", text: PROMPT }
-            ]
-          }
-        ]
-      })
-    });
-  } catch {
-    return { ok: false, messageSk: "Nepodarilo sa spojiť s AI rozpoznávaním fotiek." };
-  }
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (Anthropic ${response.status}): ${errText.slice(0, 200)}` };
-  }
-
-  const body = (await response.json()) as { content?: { type: string; text?: string }[] };
-  const text = body.content?.find((block) => block.type === "text")?.text ?? "";
-  return parseColors(text);
-}
-
-async function analyzeWithOpenAi(apiKey: string, dataUrl: string): Promise<AnalyzeFaceResult> {
-  let response: Response;
-  try {
-    response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        max_tokens: 256,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: PROMPT },
-              { type: "image_url", image_url: { url: dataUrl } }
-            ]
-          }
-        ]
-      })
-    });
-  } catch {
-    return { ok: false, messageSk: "Nepodarilo sa spojiť s AI rozpoznávaním fotiek." };
-  }
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (OpenAI ${response.status}): ${errText.slice(0, 200)}` };
-  }
-
-  const body = (await response.json()) as { choices?: { message?: { content?: string } }[] };
-  const text = body.choices?.[0]?.message?.content ?? "";
-  return parseColors(text);
 }
 
 async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: string): Promise<AnalyzeFaceResult> {
@@ -153,54 +74,13 @@ async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: 
   return parseColors(text);
 }
 
-async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<AnalyzeFaceResult> {
-  let response: Response;
-  try {
-    response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "qwen/qwen2.5-vl-32b-instruct:free",
-        max_tokens: 256,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: PROMPT },
-              { type: "image_url", image_url: { url: dataUrl } }
-            ]
-          }
-        ]
-      })
-    });
-  } catch {
-    return { ok: false, messageSk: "Nepodarilo sa spojiť s AI rozpoznávaním fotiek." };
-  }
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (OpenRouter ${response.status}): ${errText.slice(0, 200)}` };
-  }
-
-  const body = (await response.json()) as { choices?: { message?: { content?: string } }[] };
-  const text = body.choices?.[0]?.message?.content ?? "";
-  return parseColors(text);
-}
-
 /**
- * Sends one face photo (data URL) to an AI vision model and returns the 9 sticker colors
- * in the cell order described in `PROMPT`. Tries Anthropic, then OpenAI, then Gemini,
- * then OpenRouter, falling through to the next provider if one fails.
+ * Sends one face photo (data URL) to Gemini vision and returns the 9 sticker colors
+ * in the cell order described in `PROMPT`.
  */
 export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResult> {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  const openAiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  if (!anthropicKey && !openAiKey && !geminiKey && !openRouterKey) {
+  if (!geminiKey) {
     return { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
   }
 
@@ -210,24 +90,5 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
   }
   const [, mediaType, base64Data] = match;
 
-  let result: AnalyzeFaceResult = { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
-
-  if (anthropicKey) {
-    result = await analyzeWithAnthropic(anthropicKey, mediaType, base64Data);
-    if (result.ok) return result;
-  }
-  if (openAiKey) {
-    result = await analyzeWithOpenAi(openAiKey, dataUrl);
-    if (result.ok) return result;
-  }
-  if (geminiKey) {
-    result = await analyzeWithGemini(geminiKey, mediaType, base64Data);
-    if (result.ok) return result;
-  }
-  if (openRouterKey) {
-    result = await analyzeWithOpenRouter(openRouterKey, dataUrl);
-    if (result.ok) return result;
-  }
-
-  return result;
+  return analyzeWithGemini(geminiKey, mediaType, base64Data);
 }
