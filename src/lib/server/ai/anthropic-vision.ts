@@ -53,7 +53,7 @@ async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<A
         authorization: `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "qwen/qwen2.5-vl-32b-instruct:free",
+        model: "google/gemma-3-27b-it:free",
         max_tokens: 256,
         messages: [
           {
