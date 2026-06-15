@@ -130,14 +130,18 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
 
   let result: AnalyzeFaceResult = { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
 
+  const errors: string[] = [];
+
   if (openRouterKey) {
     result = await analyzeWithOpenRouter(openRouterKey, dataUrl);
     if (result.ok) return result;
+    errors.push(result.messageSk);
   }
   if (geminiKey) {
     result = await analyzeWithGemini(geminiKey, mediaType, base64Data);
     if (result.ok) return result;
+    errors.push(result.messageSk);
   }
 
-  return result;
+  return { ok: false, messageSk: errors.join(" | ") || result.messageSk };
 }
