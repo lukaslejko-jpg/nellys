@@ -53,7 +53,7 @@ async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<A
         authorization: `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-4-scout:free",
+        model: "mistralai/mistral-small-3.1-24b-instruct:free",
         max_tokens: 256,
         messages: [
           {
