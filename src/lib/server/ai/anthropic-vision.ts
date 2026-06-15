@@ -43,6 +43,43 @@ function parseColors(text: string): AnalyzeFaceResult {
   return { ok: true, colors };
 }
 
+async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<AnalyzeFaceResult> {
+  let response: Response;
+  try {
+    response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "qwen/qwen2.5-vl-32b-instruct:free",
+        max_tokens: 256,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: PROMPT },
+              { type: "image_url", image_url: { url: dataUrl } }
+            ]
+          }
+        ]
+      })
+    });
+  } catch {
+    return { ok: false, messageSk: "Nepodarilo sa spojiť s AI rozpoznávaním fotiek." };
+  }
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (OpenRouter ${response.status}): ${errText.slice(0, 200)}` };
+  }
+
+  const body = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+  const text = body.choices?.[0]?.message?.content ?? "";
+  return parseColors(text);
+}
+
 async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: string): Promise<AnalyzeFaceResult> {
   let response: Response;
   try {
@@ -75,12 +112,13 @@ async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: 
 }
 
 /**
- * Sends one face photo (data URL) to Gemini vision and returns the 9 sticker colors
- * in the cell order described in `PROMPT`.
+ * Sends one face photo (data URL) to an AI vision model and returns the 9 sticker colors
+ * in the cell order described in `PROMPT`. Tries OpenRouter first, then Gemini.
  */
 export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResult> {
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) {
+  if (!openRouterKey && !geminiKey) {
     return { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
   }
 
@@ -90,5 +128,16 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
   }
   const [, mediaType, base64Data] = match;
 
-  return analyzeWithGemini(geminiKey, mediaType, base64Data);
+  let result: AnalyzeFaceResult = { ok: false, messageSk: "AI rozpoznávanie fotiek zatiaľ nie je nakonfigurované (chýba API kľúč)." };
+
+  if (openRouterKey) {
+    result = await analyzeWithOpenRouter(openRouterKey, dataUrl);
+    if (result.ok) return result;
+  }
+  if (geminiKey) {
+    result = await analyzeWithGemini(geminiKey, mediaType, base64Data);
+    if (result.ok) return result;
+  }
+
+  return result;
 }
