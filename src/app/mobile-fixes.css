@@ -1,0 +1,63 @@
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.app-shell-mobile {
+  max-width: 100%;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.app-tab-content,
+.manual-solver,
+.ai-guide,
+.form-status,
+.camera-capture,
+.capture-mode,
+.solver-actions,
+.coach-actions {
+  min-width: 0;
+}
+
+.ai-guide,
+.form-status {
+  overflow-wrap: anywhere;
+  overflow: hidden;
+}
+
+.button {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.coach-actions {
+  grid-template-columns: 1fr;
+}
+
+.camera-thumbs {
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.camera-thumbs figure {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  place-items: center;
+}
+
+.camera-thumbs figcaption {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+@media (min-width: 560px) {
+  .coach-actions {
+    grid-template-columns: 1.2fr minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
