@@ -31,7 +31,7 @@ Neries hlavolam a nevymyslaj tahy. Iba precitaj farby nalepiek.
 Vrat IBA JSON v tvare:
 {"faces":{"U":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"],"L":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"],"R":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"],"B":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"]}}.`;
 
-const DEFAULT_OPENROUTER_VISION_MODEL = "mistralai/mistral-small-3.1-24b-instruct:free";
+const DEFAULT_OPENROUTER_VISION_MODEL = "nex-agi/nex-n2-pro:free";
 
 function extractJson(text: string): unknown {
   const match = text.match(/\{[\s\S]*\}/);
