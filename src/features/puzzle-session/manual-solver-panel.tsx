@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { deterministicScramble } from "@/lib/domain/pyraminx/fixtures";
+import { useRef, useState } from "react";
 import type { PyraminxMove } from "@/lib/domain/pyraminx/moves";
-import { applySequence } from "@/lib/domain/pyraminx/simulator";
-import { createSolvedState, type PyraminxState } from "@/lib/domain/pyraminx/state";
-import type { PyraminxFaceId } from "@/lib/domain/pyraminx/media-inspection";
+import type { PyraminxState } from "@/lib/domain/pyraminx/state";
+import { pyraminxFaceIds, type PyraminxFaceId } from "@/lib/domain/pyraminx/media-inspection";
 import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/camera-capture";
 import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
 type ApiResult =
   | { ok: true; session: { id: string; status: string; solution?: string[] | null } }
   | { ok: false; code: string; messageSk?: string };
+
+type VisionResult =
+  | { ok: true; state: PyraminxState }
+  | { ok: false; code?: string; messageSk?: string; requiresRescan?: boolean };
+
+type SolveStatus = "idle" | "capturing" | "analyzing" | "solving" | "ready" | "needs_rescan" | "error";
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
@@ -24,86 +28,101 @@ async function blobUrlToDataUrl(url: string): Promise<string> {
   });
 }
 
-async function recognizeStateFromPhotos(captures: CapturedFace[]): Promise<{ state: PyraminxState | null; messageSk: string }> {
-  try {
-    const images: Partial<Record<PyraminxFaceId, string>> = {};
-    for (const capture of captures) {
-      images[capture.face] = await blobUrlToDataUrl(capture.url);
-    }
-    const result = await postJson<{ ok: boolean; state?: PyraminxState; messageSk?: string }>(
-      "/api/pyraminx-vision",
-      { images }
-    );
-    if (result.ok && result.state) {
-      return { state: result.state, messageSk: "" };
-    }
-    return { state: null, messageSk: result.messageSk ?? "Rozpoznávanie fotiek zlyhalo." };
-  } catch {
-    return { state: null, messageSk: "Rozpoznávanie fotiek zlyhalo." };
+async function recognizeStateFromPhotos(captures: CapturedFace[]): Promise<VisionResult> {
+  const images: Partial<Record<PyraminxFaceId, string>> = {};
+  for (const capture of captures) {
+    images[capture.face] = await blobUrlToDataUrl(capture.url);
   }
+  return postJson<VisionResult>("/api/pyraminx-vision", { images });
 }
 
-async function computeSolution(initialState?: PyraminxState): Promise<{ moves: string[] | null; state: PyraminxState; status: string }> {
-  const state = initialState ?? applySequence(createSolvedState(), deterministicScramble(20260609, 9));
-
+async function computeSolution(state: PyraminxState): Promise<{ moves: string[] | null; status: string }> {
   try {
     const created = await postJson<ApiResult>("/api/puzzle-sessions");
-    if (!created.ok) return { moves: null, state, status: created.messageSk ?? "Session sa nepodarilo vytvorit." };
+    if (!created.ok) return { moves: null, status: created.messageSk ?? "Nepodarilo sa vytvorit riesenie." };
 
     const saved = await putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, {
       correctedState: state
     });
-    if (!saved.ok) return { moves: null, state, status: saved.messageSk ?? "Stav sa nepodarilo ulozit." };
+    if (!saved.ok) return { moves: null, status: saved.messageSk ?? "Nepodarilo sa ulozit rozpoznany stav." };
 
     const solved = await postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`);
-    if (!solved.ok) return { moves: null, state, status: solved.messageSk ?? "Solver tok sa nepodarilo dokoncit." };
+    if (!solved.ok) return { moves: null, status: solved.messageSk ?? "Solver nevie tento stav vyriesit." };
 
-    return { moves: solved.session.solution ?? [], state, status: "" };
+    return { moves: solved.session.solution ?? [], status: "" };
   } catch {
-    return { moves: null, state, status: "Poziadavka zlyhala. Skontroluj prihlasenie a databazu." };
+    return { moves: null, status: "Poziadavka zlyhala. Skontroluj prihlasenie, internet a databazu." };
   }
 }
 
-export function ManualSolverPanel() {
-  const [status, setStatus] = useState("");
-  const [moves, setMoves] = useState<string[] | null>(null);
-  const [scrambleState, setScrambleState] = useState<PyraminxState | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  async function runSolverFlow() {
-    setIsSubmitting(true);
-    setStatus("");
-    setMoves(null);
-    const result = await computeSolution();
-    setMoves(result.moves);
-    setScrambleState(result.state);
-    setStatus(result.status);
-    setIsSubmitting(false);
-  }
-
-  return (
-    <div className="manual-solver">
-      <div>
-        <h2>Vyrieš to so mnou! 🧩</h2>
-        <p className="muted">
-          Zatlač na &quot;Vypočítať riešenie&quot; a Nellys ti ukáže animovaný návod krok za krokom.
-        </p>
-      </div>
-      <button className="button" disabled={isSubmitting} onClick={runSolverFlow} type="button">
-        {isSubmitting ? "Pocitam..." : "Vypocitat riesenie"}
-      </button>
-      {status ? <p className="form-status">{status}</p> : null}
-      {moves && scrambleState ? <SolveGuide moves={moves as PyraminxMove[]} initialState={scrambleState} /> : null}
-    </div>
-  );
+async function fileToObjectUrl(file: File): Promise<string> {
+  return URL.createObjectURL(file);
 }
 
-export function PhotoUploadPanel({ onFinished }: { onFinished?: () => void } = {}) {
-  const [media, setMedia] = useState<{ name: string; url: string }[]>([]);
+function waitForVideoEvent(video: HTMLVideoElement, eventName: keyof HTMLMediaElementEventMap): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onEvent = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("video_error"));
+    };
+    const cleanup = () => {
+      video.removeEventListener(eventName, onEvent);
+      video.removeEventListener("error", onError);
+    };
+    video.addEventListener(eventName, onEvent, { once: true });
+    video.addEventListener("error", onError, { once: true });
+  });
+}
+
+async function extractVideoFrames(file: File): Promise<CapturedFace[]> {
+  const videoUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.src = videoUrl;
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "metadata";
+
+  try {
+    await waitForVideoEvent(video, "loadedmetadata");
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 4;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("canvas_error");
+
+    const captures: CapturedFace[] = [];
+    for (let index = 0; index < pyraminxFaceIds.length; index += 1) {
+      video.currentTime = duration * ((index + 1) / (pyraminxFaceIds.length + 1));
+      await waitForVideoEvent(video, "seeked");
+
+      const size = Math.min(video.videoWidth, video.videoHeight) || 720;
+      canvas.width = size;
+      canvas.height = size;
+      const sx = Math.max(0, (video.videoWidth - size) / 2);
+      const sy = Math.max(0, (video.videoHeight - size) / 2);
+      ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+      if (!blob) throw new Error("frame_error");
+      captures.push({ face: pyraminxFaceIds[index], url: URL.createObjectURL(blob) });
+    }
+    return captures;
+  } finally {
+    URL.revokeObjectURL(videoUrl);
+  }
+}
+
+export function PhotoUploadPanel() {
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [captures, setCaptures] = useState<CapturedFace[]>([]);
   const [moves, setMoves] = useState<string[] | null>(null);
   const [scrambleState, setScrambleState] = useState<PyraminxState | null>(null);
-  const [status, setStatus] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState("Vyber kameru, 4 fotky alebo kratke video. Nellys potom povie dalsi krok.");
+  const [status, setStatus] = useState<SolveStatus>("idle");
   const [soundEnabled, setSoundEnabled] = useState(false);
 
   function speakText(text: string) {
@@ -111,21 +130,106 @@ export function PhotoUploadPanel({ onFinished }: { onFinished?: () => void } = {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "sk-SK";
-    utterance.rate = 0.95;
+    utterance.rate = 0.92;
     window.speechSynthesis.speak(utterance);
   }
 
-  async function handleCameraComplete(captures: CapturedFace[]) {
-    media.forEach((item) => URL.revokeObjectURL(item.url));
-    setMedia(captures.map((capture) => ({ name: `kamera-${capture.face}.jpg`, url: capture.url })));
-    setIsSubmitting(true);
-    setStatus("");
-    const recognized = await recognizeStateFromPhotos(captures);
-    const result = await computeSolution(recognized.state ?? undefined);
-    setMoves(result.moves);
-    setScrambleState(result.state);
-    setStatus(recognized.state ? result.status : (recognized.messageSk || result.status));
-    setIsSubmitting(false);
+  function clearCaptures() {
+    captures.forEach((capture) => URL.revokeObjectURL(capture.url));
+    setCaptures([]);
+    setMoves(null);
+    setScrambleState(null);
+    setStatus("idle");
+    setMessage("Vyber kameru, 4 fotky alebo kratke video. Nellys potom povie dalsi krok.");
+  }
+
+  async function solveFromCaptures(nextCaptures: CapturedFace[]) {
+    captures.forEach((capture) => URL.revokeObjectURL(capture.url));
+    setCaptures(nextCaptures);
+    setMoves(null);
+    setScrambleState(null);
+    setStatus("analyzing");
+    setMessage("Mam obrazky. Teraz kontrolujem farby na vsetkych styroch stranach.");
+    speakText("Mam obrazky. Teraz kontrolujem farby na vsetkych styroch stranach.");
+
+    let recognized: VisionResult;
+    try {
+      recognized = await recognizeStateFromPhotos(nextCaptures);
+    } catch {
+      setStatus("error");
+      setMessage("AI rozpoznanie zlyhalo. Skus jasnejsie svetlo alebo odfot strany este raz.");
+      speakText("Rozpoznanie zlyhalo. Skus jasnejsie svetlo alebo odfot strany este raz.");
+      return;
+    }
+
+    if (!recognized.ok) {
+      setStatus("needs_rescan");
+      setMessage(recognized.messageSk ?? "Neviem z fotiek poskladat platny stav. Odfot strany znova pomalsie a ostrejsie.");
+      speakText("Neviem z fotiek poskladat platny stav. Odfot strany znova pomalsie a ostrejsie.");
+      return;
+    }
+
+    setStatus("solving");
+    setMessage("Stav je platny. Teraz pocitam riesenie solverom.");
+    speakText("Stav je platny. Teraz pocitam riesenie solverom.");
+    const solved = await computeSolution(recognized.state);
+
+    if (!solved.moves) {
+      setStatus("error");
+      setMessage(solved.status);
+      speakText("Solver tento stav nevie spracovat. Skus snimanie este raz.");
+      return;
+    }
+
+    setMoves(solved.moves);
+    setScrambleState(recognized.state);
+    setStatus("ready");
+    setMessage(solved.moves.length === 0 ? "Hotovo. Tento Pyraminx je uz vyrieseny." : "Riesenie je pripravene. Rob kroky zhora nadol, jeden po druhom.");
+    speakText(solved.moves.length === 0 ? "Hotovo. Tento Pyraminx je uz vyrieseny." : "Riesenie je pripravene. Rob kroky jeden po druhom.");
+  }
+
+  async function handleCameraComplete(nextCaptures: CapturedFace[]) {
+    await solveFromCaptures(nextCaptures);
+  }
+
+  async function handleImageFiles(files: FileList | null) {
+    if (!files?.length) return;
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/")).slice(0, pyraminxFaceIds.length);
+    if (imageFiles.length < pyraminxFaceIds.length) {
+      setStatus("needs_rescan");
+      setMessage("Potrebujem presne 4 ostre fotky: jednu pre kazdu stranu ihlana.");
+      speakText("Potrebujem styri ostre fotky. Jednu pre kazdu stranu ihlana.");
+      return;
+    }
+
+    setStatus("capturing");
+    setMessage("Fotky mam. Priradil som ich v poradi: horna, lava, prava, zadna strana.");
+    const nextCaptures = await Promise.all(
+      imageFiles.map(async (file, index) => ({ face: pyraminxFaceIds[index], url: await fileToObjectUrl(file) }))
+    );
+    await solveFromCaptures(nextCaptures);
+  }
+
+  async function handleVideoFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      setStatus("needs_rescan");
+      setMessage("Vybrane subory nie su video. Nahraj kratke video alebo 4 fotky.");
+      return;
+    }
+
+    setStatus("capturing");
+    setMessage("Video mam. Vyberam z neho 4 snimky: horna, lava, prava a zadna strana.");
+    speakText("Video mam. Vyberam z neho styri snimky.");
+    try {
+      const nextCaptures = await extractVideoFrames(file);
+      await solveFromCaptures(nextCaptures);
+    } catch {
+      setStatus("needs_rescan");
+      setMessage("Z videa neviem vybrat pouzitelne snimky. Natoc ihlan pomalsie alebo nahraj 4 fotky.");
+      speakText("Z videa neviem vybrat pouzitelne snimky. Natoc ihlan pomalsie alebo nahraj styri fotky.");
+    }
   }
 
   function toggleSound() {
@@ -138,40 +242,74 @@ export function PhotoUploadPanel({ onFinished }: { onFinished?: () => void } = {
 
   return (
     <div className="manual-solver">
-      <div>
-        <h2>Ukáž mi svoj Pyraminx 🔺</h2>
-        <p className="muted">
-          Použi kameru a Nellys ťa krok za krokom prevedie odfotením všetkých 4 strán.
-        </p>
-      </div>
-      <div className="solver-actions">
-        <button className="button secondary" onClick={toggleSound} type="button">
-          {soundEnabled ? "Vypnut zvuk" : "Zapnut zvuk"}
-        </button>
-      </div>
-      {media.length >= 4 ? (
-        <div className="ai-guide primary-guide">
-          <div>
-            <span>AI</span>
-            <h3>Skvelá práca! 🎉</h3>
-            <p>Mám všetky 4 strany.</p>
-          </div>
-          {isSubmitting ? <p className="form-status">Pocitam riesenie...</p> : null}
-          {status ? <p className="form-status">{status}</p> : null}
-          {moves && scrambleState ? (
-            <>
-              <SolveGuide moves={moves as PyraminxMove[]} initialState={scrambleState} />
-              {onFinished ? (
-                <button className="button" onClick={onFinished} type="button">
-                  Pokračovať na riešenie ➡️
-                </button>
-              ) : null}
-            </>
-          ) : null}
+      <section className="ai-guide primary-guide" aria-live="polite">
+        <div>
+          <span>Nellys</span>
+          <h2>Ukaz mi ihlan</h2>
+          <p>{message}</p>
         </div>
+        <div className="coach-actions">
+          <button className="button" onClick={() => imageInputRef.current?.click()} type="button">
+            Nahrat 4 fotky
+          </button>
+          <button className="button secondary" onClick={() => videoInputRef.current?.click()} type="button">
+            Nahrat video
+          </button>
+          <button className="button secondary" onClick={toggleSound} type="button">
+            {soundEnabled ? "Zvuk vypnut" : "Zvuk zapnut"}
+          </button>
+        </div>
+        <input
+          ref={imageInputRef}
+          accept="image/*"
+          multiple
+          onChange={(event) => void handleImageFiles(event.target.files)}
+          style={{ display: "none" }}
+          type="file"
+        />
+        <input
+          ref={videoInputRef}
+          accept="video/*"
+          onChange={(event) => void handleVideoFile(event.target.files)}
+          style={{ display: "none" }}
+          type="file"
+        />
+      </section>
+
+      {status === "ready" && moves && scrambleState ? (
+        <SolveGuide moves={moves as PyraminxMove[]} initialState={scrambleState} onSpeak={speakText} />
+      ) : status === "analyzing" || status === "solving" || status === "capturing" ? (
+        <section className="form-status">
+          <strong>Pracujem</strong>
+          <p>Najprv overim obrazky. Ak je stav platny, az potom zobrazim tahy solvera.</p>
+        </section>
       ) : (
         <CameraCapture onComplete={handleCameraComplete} onSpeak={speakText} />
       )}
+
+      {captures.length > 0 ? (
+        <section className="ai-guide">
+          <div>
+            <strong>Rozpoznane snimky</strong>
+            <p>Ak niektora snimka nesedi, zacni znova a ukaz strany pomalsie.</p>
+          </div>
+          <div className="camera-thumbs">
+            {captures.map((capture) => (
+              <figure key={capture.face}>
+                <img src={capture.url} alt={`Strana ${capture.face}`} />
+                <figcaption>{capture.face}</figcaption>
+              </figure>
+            ))}
+          </div>
+          <button className="button secondary" onClick={clearCaptures} type="button">
+            Zacat znova
+          </button>
+        </section>
+      ) : null}
+
+      {status === "analyzing" || status === "solving" || status === "capturing" ? (
+        <p className="form-status">Pracujem. Nezatvaraj tuto stranku.</p>
+      ) : null}
     </div>
   );
 }
