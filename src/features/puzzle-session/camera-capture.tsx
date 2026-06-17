@@ -38,6 +38,14 @@ const DEFAULT_GUIDANCE: VisualGuidance = {
   progress: 0
 };
 
+type FocusTrackCapabilities = MediaTrackCapabilities & {
+  focusMode?: string[];
+};
+
+type FocusTrackConstraint = MediaTrackConstraintSet & {
+  focusMode?: string;
+};
+
 export type CapturedFace = { face: PyraminxFaceId; url: string };
 
 function colorSignal(r: number, g: number, b: number): number {
@@ -73,8 +81,10 @@ export function CameraCapture({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement>(null);
   const autoCaptureLockRef = useRef(false);
-  const captureRef = useRef<() => void>(() => undefined);
+  const captureRef = useRef<(manual?: boolean) => void>(() => undefined);
+  const capturesRef = useRef<CapturedFace[]>([]);
   const stableProgressRef = useRef(0);
+  const stepStartedAtRef = useRef(0);
   const lastUiUpdateRef = useRef(0);
   const lastSpokenGuidanceRef = useRef("");
   const [stepIndex, setStepIndex] = useState(0);
@@ -85,12 +95,20 @@ export function CameraCapture({
   const prompt = FACE_PROMPTS[face];
 
   useEffect(() => {
+    capturesRef.current = captures;
+  }, [captures]);
+
+  useEffect(() => {
     let stream: MediaStream | null = null;
 
     async function start() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 1280 }
+          },
           audio: false
         });
         if (videoRef.current) {
@@ -110,14 +128,15 @@ export function CameraCapture({
 
   useEffect(() => {
     stableProgressRef.current = 0;
+    stepStartedAtRef.current = performance.now();
     autoCaptureLockRef.current = false;
     setGuidance(DEFAULT_GUIDANCE);
     onSpeak?.(`${prompt.title}. ${prompt.body}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIndex]);
 
-  function captureFrame() {
-    if (autoCaptureLockRef.current) return;
+  function captureFrame(manual = false) {
+    if (autoCaptureLockRef.current && !manual) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -142,7 +161,8 @@ export function CameraCapture({
         return;
       }
       const url = URL.createObjectURL(blob);
-      const next = [...captures, { face, url }];
+      const next = [...capturesRef.current, { face, url }];
+      capturesRef.current = next;
       setCaptures(next);
       setGuidance({
         state: "saved",
@@ -162,6 +182,30 @@ export function CameraCapture({
   }
 
   captureRef.current = captureFrame;
+
+  async function refocusCamera() {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    const track = stream?.getVideoTracks()[0];
+    if (!track) return;
+
+    try {
+      const capabilities = track.getCapabilities?.() as FocusTrackCapabilities | undefined;
+      if (capabilities?.focusMode?.includes("continuous")) {
+        await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as FocusTrackConstraint] });
+      }
+      setGuidance((current) => ({
+        ...current,
+        title: "Zaostrujem",
+        detail: "Drz ihlan chvilu bez pohybu."
+      }));
+    } catch {
+      setGuidance((current) => ({
+        ...current,
+        title: "Drz telefon pevne",
+        detail: "Ak je obraz rozmazany, tukni na obraz a pribliz ihlan ku svetlu."
+      }));
+    }
+  }
 
   useEffect(() => {
     let frameId = 0;
@@ -187,20 +231,23 @@ export function CameraCapture({
           const image = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
           let trianglePixels = 0;
           let colorPixels = 0;
+          let fullFrameColorPixels = 0;
           let minX = sampleSize;
           let maxX = 0;
           let minY = sampleSize;
           let maxY = 0;
           let sumX = 0;
           let sumY = 0;
+          const signalThreshold = 0.16;
 
           for (let y = 0; y < sampleSize; y += 2) {
             for (let x = 0; x < sampleSize; x += 2) {
-              if (!insideGuideTriangle(x, y, sampleSize)) continue;
-              trianglePixels += 1;
               const index = (y * sampleSize + x) * 4;
               const signal = colorSignal(image[index], image[index + 1], image[index + 2]);
-              if (signal > 0.24) {
+              if (signal > signalThreshold) fullFrameColorPixels += 1;
+              if (!insideGuideTriangle(x, y, sampleSize)) continue;
+              trianglePixels += 1;
+              if (signal > signalThreshold) {
                 colorPixels += 1;
                 minX = Math.min(minX, x);
                 maxX = Math.max(maxX, x);
@@ -213,16 +260,18 @@ export function CameraCapture({
           }
 
           const coverage = trianglePixels > 0 ? colorPixels / trianglePixels : 0;
+          const fullCoverage = fullFrameColorPixels / ((sampleSize / 2) * (sampleSize / 2));
           const centerX = colorPixels > 0 ? sumX / colorPixels / sampleSize : 0.5;
           const centerY = colorPixels > 0 ? sumY / colorPixels / sampleSize : 0.5;
           const width = colorPixels > 0 ? (maxX - minX) / sampleSize : 0;
           const height = colorPixels > 0 ? (maxY - minY) / sampleSize : 0;
           const centered = centerX > 0.2 && centerX < 0.8 && centerY > 0.16 && centerY < 0.9;
-          const largeEnough = coverage > 0.035 && width > 0.16 && height > 0.18;
-          const ready = centered && largeEnough;
+          const largeEnough = coverage > 0.025 && width > 0.12 && height > 0.14;
+          const fallbackReady = fullCoverage > 0.025 && performance.now() - stepStartedAtRef.current > 1200;
+          const ready = (centered && largeEnough) || fallbackReady;
 
           let next: VisualGuidance;
-          if (!largeEnough) {
+          if (!largeEnough && !fallbackReady) {
             stableProgressRef.current = Math.max(0, stableProgressRef.current - 0.08);
             next = {
               state: "search",
@@ -230,7 +279,7 @@ export function CameraCapture({
               detail: "Vidim malo farieb. Daj celu stranu do zlteho trojuholnika.",
               progress: stableProgressRef.current
             };
-          } else if (!centered) {
+          } else if (!centered && !fallbackReady) {
             stableProgressRef.current = Math.max(0, stableProgressRef.current - 0.05);
             next = {
               state: "center",
@@ -239,7 +288,7 @@ export function CameraCapture({
               progress: stableProgressRef.current
             };
           } else {
-            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.09);
+            stableProgressRef.current = Math.min(1, stableProgressRef.current + (fallbackReady ? 0.16 : 0.09));
             next = {
               state: "hold",
               title: "Drz takto",
@@ -260,7 +309,7 @@ export function CameraCapture({
           }
 
           if (ready && stableProgressRef.current >= 1) {
-            captureRef.current();
+            captureRef.current(false);
           }
         }
       }
@@ -276,6 +325,7 @@ export function CameraCapture({
   function restart() {
     captures.forEach((capture) => URL.revokeObjectURL(capture.url));
     stableProgressRef.current = 0;
+    stepStartedAtRef.current = performance.now();
     autoCaptureLockRef.current = false;
     setGuidance(DEFAULT_GUIDANCE);
     setCaptures([]);
@@ -289,7 +339,7 @@ export function CameraCapture({
         <strong>{prompt.title}</strong>
         <p>{prompt.body}</p>
       </div>
-      <div className={`camera-frame guidance-${guidance.state}`}>
+      <div className={`camera-frame guidance-${guidance.state}`} onClick={() => void refocusCamera()}>
         <video ref={videoRef} autoPlay muted playsInline className="camera-video" />
         <svg className="camera-overlay" viewBox="0 0 100 100" aria-hidden="true">
           <polygon points="50,8 92,84 8,84" />
@@ -327,7 +377,7 @@ export function CameraCapture({
         </div>
       ) : null}
       <div className="solver-actions">
-        <button className="button" onClick={captureFrame} type="button" disabled={!!error}>
+        <button className="button" onClick={() => captureFrame(true)} type="button" disabled={!!error}>
           Odfotit teraz
         </button>
         <button className="button secondary" onClick={restart} type="button">
