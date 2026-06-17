@@ -184,8 +184,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     image.onerror = reject;
     image.src = url;
   });
-}
-
+}\n
 function sampleStickerColor(
   ctx: CanvasRenderingContext2D,
   centerX: number,
@@ -234,6 +233,13 @@ function colorStrength(r: number, g: number, b: number): number {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   return Math.max(0, (max - min) / 30);
+}
+
+function scoreRecognizableFrame(ctx: CanvasRenderingContext2D, size: number): number {
+  const bounds = detectColoredBounds(ctx, size);
+  if (!bounds) return 0;
+  const relativeSize = bounds.size / size;
+  return relativeSize >= 0.38 ? relativeSize : 0;
 }
 
 async function computeSolution(state: PyraminxState, signal?: AbortSignal): Promise<{ moves: string[] | null; status: string }> {
@@ -318,19 +324,32 @@ async function extractVideoFrames(file: File): Promise<CapturedFace[]> {
 
     const captures: CapturedFace[] = [];
     for (let index = 0; index < pyraminxFaceIds.length; index += 1) {
-      video.currentTime = duration * ((index + 1) / (pyraminxFaceIds.length + 1));
-      await waitForVideoEvent(video, "seeked");
+      let bestBlob: Blob | null = null;
+      let bestScore = 0;
+      const segmentStart = duration * (index / pyraminxFaceIds.length);
+      const segmentEnd = duration * ((index + 1) / pyraminxFaceIds.length);
 
-      const size = Math.min(video.videoWidth, video.videoHeight) || 720;
-      canvas.width = size;
-      canvas.height = size;
-      const sx = Math.max(0, (video.videoWidth - size) / 2);
-      const sy = Math.max(0, (video.videoHeight - size) / 2);
-      ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        video.currentTime = segmentStart + (segmentEnd - segmentStart) * (attempt / 6);
+        await waitForVideoEvent(video, "seeked");
 
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
-      if (!blob) throw new Error("frame_error");
-      captures.push({ face: pyraminxFaceIds[index], url: URL.createObjectURL(blob) });
+        const size = Math.min(video.videoWidth, video.videoHeight) || 720;
+        canvas.width = size;
+        canvas.height = size;
+        const sx = Math.max(0, (video.videoWidth - size) / 2);
+        const sy = Math.max(0, (video.videoHeight - size) / 2);
+        ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+
+        const score = scoreRecognizableFrame(ctx, size);
+        if (score <= bestScore) continue;
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+        if (!blob) continue;
+        bestScore = score;
+        bestBlob = blob;
+      }
+
+      if (!bestBlob) throw new Error("frame_error");
+      captures.push({ face: pyraminxFaceIds[index], url: URL.createObjectURL(bestBlob) });
     }
     return captures;
   } finally {
