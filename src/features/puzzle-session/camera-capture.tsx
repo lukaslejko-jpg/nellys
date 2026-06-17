@@ -70,6 +70,47 @@ function insideGuideTriangle(x: number, y: number, size: number): boolean {
   return s >= 0 && t >= 0 && u >= 0;
 }
 
+function measurePyraminxInGuide(ctx: CanvasRenderingContext2D, size: number) {
+  const data = ctx.getImageData(0, 0, size, size).data;
+  let trianglePixels = 0;
+  let colorPixels = 0;
+  let minX = size;
+  let maxX = 0;
+  let minY = size;
+  let maxY = 0;
+  let sumX = 0;
+  let sumY = 0;
+  const step = Math.max(1, Math.round(size / 90));
+  const signalThreshold = 0.16;
+
+  for (let y = 0; y < size; y += step) {
+    for (let x = 0; x < size; x += step) {
+      if (!insideGuideTriangle(x, y, size)) continue;
+      trianglePixels += 1;
+      const index = (y * size + x) * 4;
+      const signal = colorSignal(data[index], data[index + 1], data[index + 2]);
+      if (signal <= signalThreshold) continue;
+      colorPixels += 1;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      sumX += x;
+      sumY += y;
+    }
+  }
+
+  const coverage = trianglePixels > 0 ? colorPixels / trianglePixels : 0;
+  const centerX = colorPixels > 0 ? sumX / colorPixels / size : 0.5;
+  const centerY = colorPixels > 0 ? sumY / colorPixels / size : 0.5;
+  const width = colorPixels > 0 ? (maxX - minX) / size : 0;
+  const height = colorPixels > 0 ? (maxY - minY) / size : 0;
+  const centered = centerX > 0.24 && centerX < 0.76 && centerY > 0.18 && centerY < 0.86;
+  const largeEnough = coverage > 0.05 && width > 0.28 && height > 0.34;
+
+  return { centered, largeEnough, ready: centered && largeEnough };
+}
+
 export function CameraCapture({
   onComplete,
   onSpeak
@@ -156,6 +197,23 @@ export function CameraCapture({
     const sy = (video.videoHeight - size) / 2;
     ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
 
+    const quality = measurePyraminxInGuide(ctx, size);
+    if (!quality.ready) {
+      stableProgressRef.current = 0;
+      setGuidance({
+        state: quality.largeEnough ? "center" : "search",
+        title: quality.largeEnough ? "Daj ihlan do stredu" : "Este neodfotim",
+        detail: quality.largeEnough
+          ? "Cela farebna strana musi byt v strede zlteho trojuholnika."
+          : "Vidim len cast alebo malo farieb. Ukaz vacsiu celu stranu bez prsta.",
+        progress: 0
+      });
+      window.setTimeout(() => {
+        autoCaptureLockRef.current = false;
+      }, 500);
+      return;
+    }
+
     canvas.toBlob((blob) => {
       if (!blob) {
         autoCaptureLockRef.current = false;
@@ -230,15 +288,7 @@ export function CameraCapture({
           const sy = Math.max(0, (video.videoHeight - crop) / 2);
           ctx.drawImage(video, sx, sy, crop, crop, 0, 0, sampleSize, sampleSize);
           const image = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
-          let trianglePixels = 0;
-          let colorPixels = 0;
           let fullFrameColorPixels = 0;
-          let minX = sampleSize;
-          let maxX = 0;
-          let minY = sampleSize;
-          let maxY = 0;
-          let sumX = 0;
-          let sumY = 0;
           const signalThreshold = 0.16;
 
           for (let y = 0; y < sampleSize; y += 2) {
@@ -246,50 +296,34 @@ export function CameraCapture({
               const index = (y * sampleSize + x) * 4;
               const signal = colorSignal(image[index], image[index + 1], image[index + 2]);
               if (signal > signalThreshold) fullFrameColorPixels += 1;
-              if (!insideGuideTriangle(x, y, sampleSize)) continue;
-              trianglePixels += 1;
-              if (signal > signalThreshold) {
-                colorPixels += 1;
-                minX = Math.min(minX, x);
-                maxX = Math.max(maxX, x);
-                minY = Math.min(minY, y);
-                maxY = Math.max(maxY, y);
-                sumX += x;
-                sumY += y;
-              }
             }
           }
 
-          const coverage = trianglePixels > 0 ? colorPixels / trianglePixels : 0;
           const fullCoverage = fullFrameColorPixels / ((sampleSize / 2) * (sampleSize / 2));
-          const centerX = colorPixels > 0 ? sumX / colorPixels / sampleSize : 0.5;
-          const centerY = colorPixels > 0 ? sumY / colorPixels / sampleSize : 0.5;
-          const width = colorPixels > 0 ? (maxX - minX) / sampleSize : 0;
-          const height = colorPixels > 0 ? (maxY - minY) / sampleSize : 0;
-          const centered = centerX > 0.2 && centerX < 0.8 && centerY > 0.16 && centerY < 0.9;
-          const largeEnough = coverage > 0.025 && width > 0.12 && height > 0.14;
-          const fallbackReady = fullCoverage > 0.08 && coverage > 0.04 && performance.now() - stepStartedAtRef.current > 2500;
-          const ready = (centered && largeEnough) || fallbackReady;
+          const quality = measurePyraminxInGuide(ctx, sampleSize);
+          const centered = quality.centered;
+          const largeEnough = quality.largeEnough || fullCoverage > 0.12;
+          const ready = quality.ready && performance.now() - stepStartedAtRef.current > 1200;
 
           let next: VisualGuidance;
-          if (!largeEnough && !fallbackReady) {
+          if (!largeEnough) {
             stableProgressRef.current = Math.max(0, stableProgressRef.current - 0.08);
             next = {
               state: "search",
               title: "Pribliz ihlan",
-              detail: "Vidim malo farieb. Daj celu stranu do zlteho trojuholnika.",
+              detail: "Ukaz celu farebnu stranu bez prsta a nech vyplni vacsinu trojuholnika.",
               progress: stableProgressRef.current
             };
-          } else if (!centered && !fallbackReady) {
+          } else if (!centered) {
             stableProgressRef.current = Math.max(0, stableProgressRef.current - 0.05);
             next = {
               state: "center",
-              title: centerX < 0.33 ? "Posun viac doprava" : centerX > 0.67 ? "Posun viac dolava" : "Daj ihlan do stredu",
+              title: "Daj ihlan do stredu",
               detail: "Cela farebna strana musi sediet v strede zlteho trojuholnika.",
               progress: stableProgressRef.current
             };
           } else {
-            stableProgressRef.current = Math.min(1, stableProgressRef.current + (fallbackReady ? 0.12 : 0.09));
+            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.05);
             next = {
               state: "hold",
               title: autoCaptureEnabled ? "Drz takto" : "Vyzera to dobre",
