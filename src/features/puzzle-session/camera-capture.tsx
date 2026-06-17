@@ -217,8 +217,8 @@ export function CameraCapture({
           const centerY = colorPixels > 0 ? sumY / colorPixels / sampleSize : 0.5;
           const width = colorPixels > 0 ? (maxX - minX) / sampleSize : 0;
           const height = colorPixels > 0 ? (maxY - minY) / sampleSize : 0;
-          const centered = centerX > 0.33 && centerX < 0.67 && centerY > 0.28 && centerY < 0.76;
-          const largeEnough = coverage > 0.13 && width > 0.28 && height > 0.32;
+          const centered = centerX > 0.2 && centerX < 0.8 && centerY > 0.16 && centerY < 0.9;
+          const largeEnough = coverage > 0.035 && width > 0.16 && height > 0.18;
           const ready = centered && largeEnough;
 
           let next: VisualGuidance;
@@ -239,7 +239,7 @@ export function CameraCapture({
               progress: stableProgressRef.current
             };
           } else {
-            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.035);
+            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.09);
             next = {
               state: "hold",
               title: "Drz takto",
@@ -308,13 +308,13 @@ export function CameraCapture({
           <span className="arrow-right">STRED</span>
         </div>
         <span className="camera-step-badge">{stepIndex + 1} / {pyraminxFaceIds.length}</span>
-        <div className="camera-guidance-card">
-          <div className="guidance-progress" aria-hidden="true">
-            <span style={{ width: `${Math.round(guidance.progress * 100)}%` }} />
-          </div>
-          <strong>{guidance.title}</strong>
-          <p>{guidance.detail}</p>
+      </div>
+      <div className={`camera-guidance-card guidance-card-${guidance.state}`} aria-live="polite">
+        <div className="guidance-progress" aria-hidden="true">
+          <span style={{ width: `${Math.round(guidance.progress * 100)}%` }} />
         </div>
+        <strong>{guidance.title}</strong>
+        <p>{guidance.detail}</p>
       </div>
       <canvas ref={canvasRef} className="camera-canvas-hidden" />
       <canvas ref={analysisCanvasRef} className="camera-canvas-hidden" />
