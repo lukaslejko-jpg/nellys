@@ -6,7 +6,7 @@ import { pyraminxFaceIds, type PyraminxFaceId } from "@/lib/domain/pyraminx/medi
 const FACE_PROMPTS: Record<PyraminxFaceId, { title: string; body: string }> = {
   U: {
     title: "Ukaz prvu celu stranu",
-    body: "Daj ihlan do zlteho trojuholnika. Ked sedi, Nellys ho odfoti sama."
+    body: "Daj ihlan do zlteho trojuholnika. Auto fotenie je zapnute."
   },
   L: {
     title: "Otoc na dalsiu stranu",
@@ -91,7 +91,7 @@ export function CameraCapture({
   const [captures, setCaptures] = useState<CapturedFace[]>([]);
   const [error, setError] = useState("");
   const [guidance, setGuidance] = useState<VisualGuidance>(DEFAULT_GUIDANCE);
-  const [autoCaptureEnabled, setAutoCaptureEnabled] = useState(false);
+  const [autoCaptureEnabled, setAutoCaptureEnabled] = useState(true);
   const face = pyraminxFaceIds[stepIndex];
   const prompt = FACE_PROMPTS[face];
 
@@ -269,7 +269,7 @@ export function CameraCapture({
           const centered = centerX > 0.2 && centerX < 0.8 && centerY > 0.16 && centerY < 0.9;
           const largeEnough = coverage > 0.025 && width > 0.12 && height > 0.14;
           const fallbackReady = fullCoverage > 0.08 && coverage > 0.04 && performance.now() - stepStartedAtRef.current > 2500;
-          const ready = centered && largeEnough;
+          const ready = (centered && largeEnough) || fallbackReady;
 
           let next: VisualGuidance;
           if (!largeEnough && !fallbackReady) {
@@ -288,16 +288,8 @@ export function CameraCapture({
               detail: "Cela farebna strana musi sediet v strede zlteho trojuholnika.",
               progress: stableProgressRef.current
             };
-          } else if (fallbackReady && !ready) {
-            stableProgressRef.current = Math.min(0.82, stableProgressRef.current + 0.05);
-            next = {
-              state: "center",
-              title: "Vidim ihlan",
-              detail: "Este ho daj presnejsie do trojuholnika alebo stlac Odfotit teraz.",
-              progress: stableProgressRef.current
-            };
           } else {
-            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.09);
+            stableProgressRef.current = Math.min(1, stableProgressRef.current + (fallbackReady ? 0.12 : 0.09));
             next = {
               state: "hold",
               title: autoCaptureEnabled ? "Drz takto" : "Vyzera to dobre",
