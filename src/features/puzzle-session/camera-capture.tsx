@@ -91,6 +91,7 @@ export function CameraCapture({
   const [captures, setCaptures] = useState<CapturedFace[]>([]);
   const [error, setError] = useState("");
   const [guidance, setGuidance] = useState<VisualGuidance>(DEFAULT_GUIDANCE);
+  const [autoCaptureEnabled, setAutoCaptureEnabled] = useState(false);
   const face = pyraminxFaceIds[stepIndex];
   const prompt = FACE_PROMPTS[face];
 
@@ -267,8 +268,8 @@ export function CameraCapture({
           const height = colorPixels > 0 ? (maxY - minY) / sampleSize : 0;
           const centered = centerX > 0.2 && centerX < 0.8 && centerY > 0.16 && centerY < 0.9;
           const largeEnough = coverage > 0.025 && width > 0.12 && height > 0.14;
-          const fallbackReady = fullCoverage > 0.025 && performance.now() - stepStartedAtRef.current > 1200;
-          const ready = (centered && largeEnough) || fallbackReady;
+          const fallbackReady = fullCoverage > 0.08 && coverage > 0.04 && performance.now() - stepStartedAtRef.current > 2500;
+          const ready = centered && largeEnough;
 
           let next: VisualGuidance;
           if (!largeEnough && !fallbackReady) {
@@ -287,12 +288,20 @@ export function CameraCapture({
               detail: "Cela farebna strana musi sediet v strede zlteho trojuholnika.",
               progress: stableProgressRef.current
             };
+          } else if (fallbackReady && !ready) {
+            stableProgressRef.current = Math.min(0.82, stableProgressRef.current + 0.05);
+            next = {
+              state: "center",
+              title: "Vidim ihlan",
+              detail: "Este ho daj presnejsie do trojuholnika alebo stlac Odfotit teraz.",
+              progress: stableProgressRef.current
+            };
           } else {
-            stableProgressRef.current = Math.min(1, stableProgressRef.current + (fallbackReady ? 0.16 : 0.09));
+            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.09);
             next = {
               state: "hold",
-              title: "Drz takto",
-              detail: "Nehyb sa. Ked sa kruh naplni, snimka sa ulozi.",
+              title: autoCaptureEnabled ? "Drz takto" : "Vyzera to dobre",
+              detail: autoCaptureEnabled ? "Nehyb sa. Ked sa kruh naplni, snimka sa ulozi." : "Stlac Odfotit teraz, alebo zapni auto fotenie.",
               progress: stableProgressRef.current
             };
           }
@@ -308,7 +317,7 @@ export function CameraCapture({
             onSpeak?.(next.title);
           }
 
-          if (ready && stableProgressRef.current >= 1) {
+          if (autoCaptureEnabled && ready && stableProgressRef.current >= 1) {
             captureRef.current(false);
           }
         }
@@ -320,7 +329,7 @@ export function CameraCapture({
     frameId = window.requestAnimationFrame(analyze);
     return () => window.cancelAnimationFrame(frameId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [error, stepIndex]);
+  }, [autoCaptureEnabled, error, stepIndex]);
 
   function restart() {
     captures.forEach((capture) => URL.revokeObjectURL(capture.url));
@@ -379,6 +388,9 @@ export function CameraCapture({
       <div className="solver-actions">
         <button className="button" onClick={() => captureFrame(true)} type="button" disabled={!!error}>
           Odfotit teraz
+        </button>
+        <button className="button secondary" onClick={() => setAutoCaptureEnabled((value) => !value)} type="button" disabled={!!error}>
+          {autoCaptureEnabled ? "Auto fotenie vypnut" : "Auto fotenie zapnut"}
         </button>
         <button className="button secondary" onClick={restart} type="button">
           Zacat znova
