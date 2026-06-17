@@ -18,6 +18,7 @@ type VisionResult =
 type SolveStatus = "idle" | "capturing" | "analyzing" | "solving" | "ready" | "needs_rescan" | "error";
 
 const ANALYSIS_TIMEOUT_MS = 15000;
+const SOLVER_TIMEOUT_MS = 15000;
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
@@ -38,23 +39,30 @@ async function recognizeStateFromPhotos(captures: CapturedFace[], signal?: Abort
   return postJson<VisionResult>("/api/pyraminx-vision", { images }, signal);
 }
 
-async function computeSolution(state: PyraminxState): Promise<{ moves: string[] | null; status: string }> {
+async function computeSolution(state: PyraminxState, signal?: AbortSignal): Promise<{ moves: string[] | null; status: string }> {
   try {
-    const created = await postJson<ApiResult>("/api/puzzle-sessions");
+    const created = await postJson<ApiResult>("/api/puzzle-sessions", undefined, signal);
     if (!created.ok) return { moves: null, status: created.messageSk ?? "Nepodarilo sa vytvorit riesenie." };
 
     const saved = await putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, {
       correctedState: state
-    });
+    }, signal);
     if (!saved.ok) return { moves: null, status: saved.messageSk ?? "Nepodarilo sa ulozit rozpoznany stav." };
 
-    const solved = await postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`);
+    const solved = await postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`, undefined, signal);
     if (!solved.ok) return { moves: null, status: solved.messageSk ?? "Solver nevie tento stav vyriesit." };
 
     return { moves: solved.session.solution ?? [], status: "" };
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) {
+      return { moves: null, status: "Vypocet trval prilis dlho. Skus snimky este raz alebo nahraj kratsie video." };
+    }
     return { moves: null, status: "Poziadavka zlyhala. Skontroluj prihlasenie, internet a databazu." };
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 async function fileToObjectUrl(file: File): Promise<string> {
@@ -126,6 +134,7 @@ export function PhotoUploadPanel() {
   const [message, setMessage] = useState("Ukaz mi 4 cele strany ihlana. Potom automaticky precitam stav a pustim solver.");
   const [status, setStatus] = useState<SolveStatus>("idle");
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const activeJobRef = useRef(0);
 
   function speakText(text: string) {
     if (!soundEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -137,6 +146,7 @@ export function PhotoUploadPanel() {
   }
 
   function clearCaptures() {
+    activeJobRef.current += 1;
     captures.forEach((capture) => URL.revokeObjectURL(capture.url));
     setCaptures([]);
     setMoves(null);
@@ -157,13 +167,15 @@ export function PhotoUploadPanel() {
   }
 
   async function solveFromCaptures(nextCaptures: CapturedFace[]) {
+    const jobId = activeJobRef.current + 1;
+    activeJobRef.current = jobId;
     captures.forEach((capture) => URL.revokeObjectURL(capture.url));
     setCaptures(nextCaptures);
     setMoves(null);
     setScrambleState(null);
     setStatus("analyzing");
-    setMessage("Mam 4 snimky. Teraz z nich citam farby a hladam platny stav Pyraminxu.");
-    speakText("Mam styri snimky. Teraz citam farby.");
+    setMessage("Mam obrazky. Automaticky citam farby a kontrolujem, ci z nich vznikne platny Pyraminx.");
+    speakText("Mam obrazky. Automaticky citam farby.");
 
     let recognized: VisionResult;
     const controller = new AbortController();
@@ -171,7 +183,8 @@ export function PhotoUploadPanel() {
     try {
       recognized = await recognizeStateFromPhotos(nextCaptures, controller.signal);
     } catch (error) {
-      const aborted = error instanceof DOMException && error.name === "AbortError";
+      if (activeJobRef.current !== jobId) return;
+      const aborted = isAbortError(error);
       askForRescan(
         aborted
           ? "AI nestihla precitat stav do 15 sekund. Skus video alebo ukaz 4 strany znova pomalsie a zblizka."
@@ -182,6 +195,8 @@ export function PhotoUploadPanel() {
       window.clearTimeout(timeoutId);
     }
 
+    if (activeJobRef.current !== jobId) return;
+
     if (!recognized.ok) {
       askForRescan(recognized.messageSk ?? "AI neprecitala platny stav. Ukaz ihlan znova pomalsie a zblizka.");
       return;
@@ -190,7 +205,12 @@ export function PhotoUploadPanel() {
     setStatus("solving");
     setMessage("Stav sedi. Teraz solver pocita a overuje tahy.");
     speakText("Stav sedi. Teraz pocitam riesenie.");
-    const solved = await computeSolution(recognized.state);
+    const solveController = new AbortController();
+    const solveTimeoutId = window.setTimeout(() => solveController.abort(), SOLVER_TIMEOUT_MS);
+    const solved = await computeSolution(recognized.state, solveController.signal);
+    window.clearTimeout(solveTimeoutId);
+
+    if (activeJobRef.current !== jobId) return;
 
     if (!solved.moves) {
       setStatus("error");
@@ -212,6 +232,7 @@ export function PhotoUploadPanel() {
 
   async function handleImageFiles(files: FileList | null) {
     if (!files?.length) return;
+    if (imageInputRef.current) imageInputRef.current.value = "";
     const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/")).slice(0, pyraminxFaceIds.length);
     if (imageFiles.length < pyraminxFaceIds.length) {
       askForRescan("Potrebujem presne 4 ostre fotky: jednu pre kazdu stranu ihlana.");
@@ -229,13 +250,14 @@ export function PhotoUploadPanel() {
   async function handleVideoFile(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
+    if (videoInputRef.current) videoInputRef.current.value = "";
     if (!file.type.startsWith("video/")) {
       askForRescan("Vybrany subor nie je video. Nahraj kratke video alebo 4 fotky.");
       return;
     }
 
     setStatus("capturing");
-    setMessage("Video mam. Vyberam z neho 4 snimky a potom automaticky pustim AI.");
+    setMessage("Video mam. Vyberam z neho 4 snimky. Hned potom spustim AI a solver.");
     speakText("Video mam. Vyberam z neho styri snimky.");
     try {
       const nextCaptures = await extractVideoFrames(file);
@@ -353,11 +375,12 @@ async function postJson<T>(url: string, body?: unknown, signal?: AbortSignal): P
   return response.json() as Promise<T>;
 }
 
-async function putJson<T>(url: string, body: unknown): Promise<T> {
+async function putJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal
   });
   return response.json() as Promise<T>;
 }
