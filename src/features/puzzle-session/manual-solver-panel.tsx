@@ -33,6 +33,8 @@ const STICKER_SAMPLE_POINTS = [
   [0.78, 0.68]
 ] as const;
 
+const FACE_ASSIGNMENTS = buildFaceAssignments();
+
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
   const blob = await response.blob();
@@ -53,22 +55,54 @@ async function recognizeStateFromPhotos(captures: CapturedFace[], signal?: Abort
 }
 
 async function recognizeStateLocally(captures: CapturedFace[]): Promise<VisionResult> {
-  const faceColors = {} as Record<FaceId, StickerColorId[]>;
+  const sampledFaces: StickerColorId[][] = [];
 
   for (const capture of captures) {
     const colors = await sampleFaceColors(capture.url);
     if (!colors) {
       return { ok: false, messageSk: "Fotky su rozmazane alebo je na nich malo farieb." };
     }
-    faceColors[capture.face as FaceId] = colors;
+    sampledFaces.push(colors);
   }
 
-  const state = decodeStateFromFaceColors(faceColors);
+  const state = decodeStateFromAnyFaceAssignment(sampledFaces);
   if (!state) {
-    return { ok: false, messageSk: "Lokalne citanie farieb nenaslo platny Pyraminx stav." };
+    return { ok: false, messageSk: "Lokalne citanie farieb nenaslo platny Pyraminx stav ani po prehodeni stran." };
   }
 
   return { ok: true, state };
+}
+
+function buildFaceAssignments(): FaceId[][] {
+  const faces = [...pyraminxFaceIds] as FaceId[];
+  const result: FaceId[][] = [];
+
+  function permute(prefix: FaceId[], remaining: FaceId[]) {
+    if (remaining.length === 0) {
+      result.push(prefix);
+      return;
+    }
+    for (let index = 0; index < remaining.length; index += 1) {
+      permute([...prefix, remaining[index]], [...remaining.slice(0, index), ...remaining.slice(index + 1)]);
+    }
+  }
+
+  permute([], faces);
+  return result;
+}
+
+function decodeStateFromAnyFaceAssignment(sampledFaces: StickerColorId[][]): PyraminxState | null {
+  for (const assignment of FACE_ASSIGNMENTS) {
+    const faceColors = {} as Record<FaceId, StickerColorId[]>;
+    for (let index = 0; index < assignment.length; index += 1) {
+      faceColors[assignment[index]] = sampledFaces[index];
+    }
+
+    const state = decodeStateFromFaceColors(faceColors);
+    if (state) return state;
+  }
+
+  return null;
 }
 
 async function sampleFaceColors(url: string): Promise<StickerColorId[] | null> {
