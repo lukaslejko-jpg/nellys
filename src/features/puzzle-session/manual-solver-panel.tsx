@@ -194,8 +194,8 @@ export function PhotoUploadPanel() {
       setManualMode(true);
       setMessage(
         aborted
-          ? "AI nestihla rozpoznat farby. Teraz ich vyber rucne na snimkach a ja potom pustim solver."
-          : "AI rozpoznanie zlyhalo. Vyber farby rucne na snimkach a ja potom pustim solver."
+          ? "AI nestihla precitat platny stav. Skus znova 4 ostre fotky zblizka, alebo dole tukni farby na snimkach a ja hned pustim solver."
+          : "AI neprecitala platny stav. Skus znova 4 ostre fotky zblizka, alebo dole tukni farby na snimkach a ja hned pustim solver."
       );
       speakText("AI nestihla rozpoznat farby. Vyber farby rucne na snimkach a potom spustim solver.");
       return;
@@ -206,7 +206,7 @@ export function PhotoUploadPanel() {
     if (!recognized.ok) {
       setStatus("needs_rescan");
       setManualMode(true);
-      setMessage("AI nevie stav spolahlivo precitat. Vyber farby rucne na snimkach a solver vypocita tahy.");
+      setMessage("AI neprecitala platny stav. Skus znova 4 ostre fotky zblizka, alebo dole tukni farby na snimkach a ja hned pustim solver.");
       speakText("AI nevie stav spolahlivo precitat. Vyber farby rucne na snimkach a potom spustim solver.");
       return;
     }
