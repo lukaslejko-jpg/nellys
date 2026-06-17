@@ -184,7 +184,8 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     image.onerror = reject;
     image.src = url;
   });
-}\n
+}
+
 function sampleStickerColor(
   ctx: CanvasRenderingContext2D,
   centerX: number,
