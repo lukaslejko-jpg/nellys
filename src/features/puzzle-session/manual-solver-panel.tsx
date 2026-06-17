@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import type { PyraminxMove } from "@/lib/domain/pyraminx/moves";
 import type { PyraminxState } from "@/lib/domain/pyraminx/state";
-import { pyraminxFaceIds, type PyraminxFaceId } from "@/lib/domain/pyraminx/media-inspection";
+import { pyraminxFaceIds, type PyraminxFaceId, type StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
+import { decodeStateFromFaceColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
 import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/camera-capture";
 import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
@@ -17,8 +18,20 @@ type VisionResult =
 
 type SolveStatus = "idle" | "capturing" | "analyzing" | "solving" | "ready" | "needs_rescan" | "error";
 
-const ANALYSIS_TIMEOUT_MS = 15000;
+const ANALYSIS_TIMEOUT_MS = 8000;
 const SOLVER_TIMEOUT_MS = 15000;
+
+const STICKER_SAMPLE_POINTS = [
+  [0.5, 0.18],
+  [0.36, 0.38],
+  [0.5, 0.38],
+  [0.64, 0.38],
+  [0.22, 0.68],
+  [0.36, 0.68],
+  [0.5, 0.68],
+  [0.64, 0.68],
+  [0.78, 0.68]
+] as const;
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
@@ -37,6 +50,109 @@ async function recognizeStateFromPhotos(captures: CapturedFace[], signal?: Abort
     images[capture.face] = await blobUrlToDataUrl(capture.url);
   }
   return postJson<VisionResult>("/api/pyraminx-vision", { images }, signal);
+}
+
+async function recognizeStateLocally(captures: CapturedFace[]): Promise<VisionResult> {
+  const faceColors = {} as Record<FaceId, StickerColorId[]>;
+
+  for (const capture of captures) {
+    const colors = await sampleFaceColors(capture.url);
+    if (!colors) {
+      return { ok: false, messageSk: "Fotky su rozmazane alebo je na nich malo farieb." };
+    }
+    faceColors[capture.face as FaceId] = colors;
+  }
+
+  const state = decodeStateFromFaceColors(faceColors);
+  if (!state) {
+    return { ok: false, messageSk: "Lokalne citanie farieb nenaslo platny Pyraminx stav." };
+  }
+
+  return { ok: true, state };
+}
+
+async function sampleFaceColors(url: string): Promise<StickerColorId[] | null> {
+  const image = await loadImage(url);
+  const size = Math.min(image.naturalWidth, image.naturalHeight);
+  if (!size) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+
+  const sx = Math.max(0, (image.naturalWidth - size) / 2);
+  const sy = Math.max(0, (image.naturalHeight - size) / 2);
+  ctx.drawImage(image, sx, sy, size, size, 0, 0, size, size);
+
+  const radius = Math.max(10, Math.round(size * 0.045));
+  const colors: StickerColorId[] = [];
+  for (const [px, py] of STICKER_SAMPLE_POINTS) {
+    const color = sampleStickerColor(ctx, Math.round(px * size), Math.round(py * size), radius, size);
+    if (!color) return null;
+    colors.push(color);
+  }
+  return colors;
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+function sampleStickerColor(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  centerY: number,
+  radius: number,
+  size: number
+): StickerColorId | null {
+  const totals = {
+    red: 0,
+    green: 0,
+    blue: 0,
+    yellow: 0
+  } satisfies Record<StickerColorId, number>;
+  const left = Math.max(0, centerX - radius);
+  const top = Math.max(0, centerY - radius);
+  const width = Math.min(size - left, radius * 2);
+  const height = Math.min(size - top, radius * 2);
+  const data = ctx.getImageData(left, top, width, height).data;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const r = data[index];
+    const g = data[index + 1];
+    const b = data[index + 2];
+    const color = classifyStickerColor(r, g, b);
+    if (color) totals[color] += colorStrength(r, g, b);
+  }
+
+  const entries = Object.entries(totals) as [StickerColorId, number][];
+  const [bestColor, bestScore] = entries.sort((a, b) => b[1] - a[1])[0];
+  return bestScore > 8 ? bestColor : null;
+}
+
+function classifyStickerColor(r: number, g: number, b: number): StickerColorId | null {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max < 65 || max - min < 24) return null;
+
+  if (r > 135 && g > 110 && b < 110) return "yellow";
+  if (g > r * 1.08 && g > b * 1.08) return "green";
+  if (b > r * 1.06 && b > g * 1.04) return "blue";
+  if (r > g * 1.08 && r > b * 1.08) return "red";
+  return null;
+}
+
+function colorStrength(r: number, g: number, b: number): number {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return Math.max(0, (max - min) / 30);
 }
 
 async function computeSolution(state: PyraminxState, signal?: AbortSignal): Promise<{ moves: string[] | null; status: string }> {
@@ -193,25 +309,28 @@ export function PhotoUploadPanel() {
     setMoves(null);
     setScrambleState(null);
     setStatus("analyzing");
-    setMessage("Mam obrazky. Automaticky citam farby a kontrolujem, ci z nich vznikne platny Pyraminx.");
-    speakText("Mam obrazky. Automaticky citam farby.");
+    setMessage("Mam obrazky. Najprv citam farby priamo v telefone. Ak to neprejde, skusim AI.");
+    speakText("Mam obrazky. Citam farby.");
 
-    let recognized: VisionResult;
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
-    try {
-      recognized = await recognizeStateFromPhotos(nextCaptures, controller.signal);
-    } catch (error) {
-      if (activeJobRef.current !== jobId) return;
-      const aborted = isAbortError(error);
-      askForRescan(
-        aborted
-          ? "AI nestihla precitat stav do 15 sekund. Skus video alebo ukaz 4 strany znova pomalsie a zblizka."
-          : "AI neprecitala stav. Skus video alebo ukaz 4 strany znova pomalsie a zblizka."
-      );
-      return;
-    } finally {
-      window.clearTimeout(timeoutId);
+    let recognized = await recognizeStateLocally(nextCaptures);
+    if (!recognized.ok) {
+      setMessage("Lokalne citanie nestacilo. Skusam AI rozpoznanie, najviac 8 sekund.");
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
+      try {
+        recognized = await recognizeStateFromPhotos(nextCaptures, controller.signal);
+      } catch (error) {
+        if (activeJobRef.current !== jobId) return;
+        const aborted = isAbortError(error);
+        askForRescan(
+          aborted
+            ? "AI nestihla precitat stav do 8 sekund. Skus video alebo ukaz 4 strany znova pomalsie a zblizka."
+            : "AI neprecitala stav. Skus video alebo ukaz 4 strany znova pomalsie a zblizka."
+        );
+        return;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
     }
 
     if (activeJobRef.current !== jobId) return;
