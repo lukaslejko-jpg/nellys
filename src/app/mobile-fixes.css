@@ -122,17 +122,16 @@ body {
 }
 
 .camera-guidance-card {
-  background: rgba(10, 31, 68, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: #0a1f44;
+  border: 1px solid #203b68;
   border-radius: 10px;
-  bottom: 10px;
   color: #ffffff;
   display: grid;
   gap: 4px;
-  left: 10px;
+  margin: -2px auto 0;
+  max-width: 360px;
   padding: 10px;
-  position: absolute;
-  right: 10px;
+  width: 100%;
 }
 
 .camera-guidance-card strong {
@@ -159,6 +158,56 @@ body {
   display: block;
   height: 100%;
   transition: width 0.14s linear;
+}
+
+.guidance-card-search .guidance-progress span,
+.guidance-card-center .guidance-progress span {
+  background: #fbbf24;
+}
+
+.scan-status-panel {
+  background: #eef6ff;
+  border: 1px solid #bcd7ff;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+  padding: 14px;
+}
+
+.scan-status-panel strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.scan-status-panel p {
+  margin: 0;
+}
+
+.scan-loader {
+  background: #dbeafe;
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.scan-loader span {
+  animation: scanLoader 1.2s ease-in-out infinite;
+  background: var(--blue);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  width: 44%;
+}
+
+@keyframes scanLoader {
+  0% {
+    transform: translateX(-105%);
+  }
+
+  100% {
+    transform: translateX(240%);
+  }
 }
 
 @keyframes focusPulse {
