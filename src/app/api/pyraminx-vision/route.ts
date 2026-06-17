@@ -25,9 +25,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const analyzedFaces = await Promise.all(
+    pyraminxFaceIds.map(async (face) => ({
+      face,
+      result: await analyzeFaceImage(images[face]!)
+    }))
+  );
+
   const faceColors: Record<FaceId, StickerColorId[]> = { U: [], L: [], R: [], B: [] };
-  for (const face of pyraminxFaceIds) {
-    const result = await analyzeFaceImage(images[face]!);
+  for (const { face, result } of analyzedFaces) {
     if (!result.ok) {
       return NextResponse.json({ ok: false, code: "analysis_failed", messageSk: result.messageSk, requiresRescan: true }, { status: 200 });
     }
