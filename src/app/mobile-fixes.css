@@ -57,6 +57,122 @@ body {
   font-weight: 800;
 }
 
+.camera-frame.guidance-hold .camera-overlay polygon {
+  fill: rgba(34, 197, 94, 0.16);
+  stroke: #22c55e;
+}
+
+.camera-frame.guidance-saved .camera-overlay polygon {
+  fill: rgba(34, 197, 94, 0.22);
+  stroke: #16a34a;
+}
+
+.camera-focus-pulse {
+  border: 2px solid rgba(255, 190, 72, 0.9);
+  clip-path: polygon(50% 4%, 96% 88%, 4% 88%);
+  inset: 8%;
+  pointer-events: none;
+  position: absolute;
+}
+
+.guidance-hold .camera-focus-pulse {
+  animation: focusPulse 0.9s ease-in-out infinite alternate;
+  border-color: rgba(34, 197, 94, 0.95);
+}
+
+.camera-arrows {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.camera-arrows span {
+  background: rgba(10, 31, 68, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  padding: 4px 8px;
+  position: absolute;
+}
+
+.arrow-up {
+  left: 50%;
+  top: 7%;
+  transform: translateX(-50%);
+}
+
+.arrow-left {
+  left: 6%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.arrow-right {
+  right: 6%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.guidance-hold .camera-arrows,
+.guidance-saved .camera-arrows {
+  opacity: 0.18;
+}
+
+.camera-guidance-card {
+  background: rgba(10, 31, 68, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 10px;
+  bottom: 10px;
+  color: #ffffff;
+  display: grid;
+  gap: 4px;
+  left: 10px;
+  padding: 10px;
+  position: absolute;
+  right: 10px;
+}
+
+.camera-guidance-card strong {
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+.camera-guidance-card p {
+  font-size: 12px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.guidance-progress {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.guidance-progress span {
+  background: #22c55e;
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 0.14s linear;
+}
+
+@keyframes focusPulse {
+  from {
+    opacity: 0.65;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
 .rescan-guide {
   background: #fff7ed;
   border: 1px solid #fed7aa;
