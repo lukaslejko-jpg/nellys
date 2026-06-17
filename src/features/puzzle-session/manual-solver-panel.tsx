@@ -120,14 +120,61 @@ async function sampleFaceColors(url: string): Promise<StickerColorId[] | null> {
   const sy = Math.max(0, (image.naturalHeight - size) / 2);
   ctx.drawImage(image, sx, sy, size, size, 0, 0, size, size);
 
-  const radius = Math.max(10, Math.round(size * 0.045));
+  const bounds = detectColoredBounds(ctx, size);
+  if (!bounds) return null;
+
+  const radius = Math.max(8, Math.round(bounds.size * 0.055));
   const colors: StickerColorId[] = [];
   for (const [px, py] of STICKER_SAMPLE_POINTS) {
-    const color = sampleStickerColor(ctx, Math.round(px * size), Math.round(py * size), radius, size);
+    const color = sampleStickerColor(
+      ctx,
+      Math.round(bounds.left + px * bounds.size),
+      Math.round(bounds.top + py * bounds.size),
+      radius,
+      size
+    );
     if (!color) return null;
     colors.push(color);
   }
   return colors;
+}
+
+function detectColoredBounds(ctx: CanvasRenderingContext2D, size: number): { left: number; top: number; size: number } | null {
+  const data = ctx.getImageData(0, 0, size, size).data;
+  let minX = size;
+  let minY = size;
+  let maxX = 0;
+  let maxY = 0;
+  let count = 0;
+  const step = Math.max(2, Math.round(size / 180));
+
+  for (let y = 0; y < size; y += step) {
+    for (let x = 0; x < size; x += step) {
+      const index = (y * size + x) * 4;
+      if (!classifyStickerColor(data[index], data[index + 1], data[index + 2])) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      count += 1;
+    }
+  }
+
+  if (count < 80 || maxX <= minX || maxY <= minY) return null;
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const boxSize = Math.max(width, height);
+  const padding = Math.round(boxSize * 0.08);
+  const finalSize = Math.min(size, boxSize + padding * 2);
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  return {
+    left: Math.max(0, Math.min(size - finalSize, Math.round(centerX - finalSize / 2))),
+    top: Math.max(0, Math.min(size - finalSize, Math.round(centerY - finalSize / 2))),
+    size: finalSize
+  };
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -347,6 +394,7 @@ export function PhotoUploadPanel() {
     speakText("Mam obrazky. Citam farby.");
 
     let recognized = await recognizeStateLocally(nextCaptures);
+    const localMessage = recognized.ok ? "" : recognized.messageSk;
     if (!recognized.ok) {
       setMessage("Lokalne citanie nestacilo. Skusam AI rozpoznanie, najviac 8 sekund.");
       const controller = new AbortController();
@@ -358,8 +406,8 @@ export function PhotoUploadPanel() {
         const aborted = isAbortError(error);
         askForRescan(
           aborted
-            ? "AI nestihla precitat stav do 8 sekund. Skus video alebo ukaz 4 strany znova pomalsie a zblizka."
-            : "AI neprecitala stav. Skus video alebo ukaz 4 strany znova pomalsie a zblizka."
+            ? `${localMessage ?? "Lokalne citanie este nenaslo platny stav."} AI nestihla do 8 sekund. Stlac Skenovat znova a ukaz kazdu stranu vacsiu v trojuholniku.`
+            : `${localMessage ?? "Lokalne citanie este nenaslo platny stav."} AI tiez neprecitala stav. Stlac Skenovat znova a ukaz kazdu stranu vacsiu v trojuholniku.`
         );
         return;
       } finally {
