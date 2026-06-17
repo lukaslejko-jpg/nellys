@@ -65,6 +65,22 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+function toUserRescanMessage(text?: string): string {
+  if (!text) {
+    return "AI z tychto snimok neprecitala farby spolahlivo. Skus znova: viac svetla, ihlan blizsie a jedna cela strana v trojuholniku.";
+  }
+
+  if (/OpenRouter|Gemini|model|quota|API|404|429/i.test(text)) {
+    return "AI rozpoznanie teraz nevratilo pouzitelne farby. Solver preto este nemoze vypocitat tahy. Skus znova s ostrejsim zaberom alebo nahraj kratke video.";
+  }
+
+  if (/decode|platny|Farby/i.test(text)) {
+    return "Farby zo snimok nedavaju platny Pyraminx stav. Skus znova a ukaz kazdu zo 4 stran samostatne, rovno a zblizka.";
+  }
+
+  return text;
+}
+
 async function fileToObjectUrl(file: File): Promise<string> {
   return URL.createObjectURL(file);
 }
@@ -155,13 +171,16 @@ export function PhotoUploadPanel() {
     setMessage("Ukaz mi 4 cele strany ihlana. Potom automaticky precitam stav a pustim solver.");
   }
 
+  function retryCapture() {
+    clearCaptures();
+    setMessage("Ukaz prvu celu stranu. Nellys bude fotit automaticky, ked bude ihlan sediet v trojuholniku.");
+  }
+
   function askForRescan(text?: string) {
     setStatus("needs_rescan");
     setMoves(null);
     setScrambleState(null);
-    const nextMessage =
-      text ??
-      "Nevidim platny stav. Ukaz ihlan este raz: cela strana musi byt v trojuholniku, ostro, zblizka a bez odlesku.";
+    const nextMessage = toUserRescanMessage(text);
     setMessage(nextMessage);
     speakText(nextMessage);
   }
@@ -322,20 +341,28 @@ export function PhotoUploadPanel() {
           </div>
         </section>
       ) : (
-        <>
-          {status === "needs_rescan" || status === "error" ? (
-            <section className="rescan-guide">
-              <strong>Skus znova takto</strong>
-              <ol>
-                <li>Drz ihlan spickou hore.</li>
-                <li>Daj jednu celu farebnu stranu do trojuholnika.</li>
-                <li>Chvilu stoj, potom pomaly otoc na dalsiu stranu.</li>
-                <li>Ukaz vsetky 4 strany. Nellys potom sama pusti solver.</li>
-              </ol>
-            </section>
-          ) : null}
+        status === "needs_rescan" || status === "error" ? (
+          <section className="rescan-guide action-rescan" aria-live="polite">
+            <strong>Este nemam stav pre solver</strong>
+            <p>{message}</p>
+            <ol>
+              <li>Daj do zlteho trojuholnika jednu celu stranu.</li>
+              <li>Drz telefon aj ihlan 2 sekundy bez pohybu.</li>
+              <li>Potom pomaly otoc na dalsiu stranu.</li>
+              <li>Po 4 stranach Nellys hned skusi AI a solver znova.</li>
+            </ol>
+            <div className="solver-actions">
+              <button className="button" onClick={retryCapture} type="button">
+                Skenovat znova
+              </button>
+              <button className="button secondary" onClick={() => videoInputRef.current?.click()} type="button">
+                Nahrat video
+              </button>
+            </div>
+          </section>
+        ) : (
           <CameraCapture onComplete={handleCameraComplete} onSpeak={speakText} />
-        </>
+        )
       )}
 
       {captures.length > 0 ? (
