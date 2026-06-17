@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { pyraminxFaceIds, type PyraminxFaceId, type StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
 import { decodeStateFromFaceColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
-import { analyzeFaceImage, analyzePyraminxImages } from "@/lib/server/ai/anthropic-vision";
+import { analyzePyraminxImages } from "@/lib/server/ai/anthropic-vision";
 import { requireActorFromSessionCookie } from "@/lib/server/auth/require-actor";
 
 type RequestBody = {
@@ -30,24 +30,12 @@ export async function POST(request: Request) {
   const faceColors: Record<FaceId, StickerColorId[]> = { U: [], L: [], R: [], B: [] };
 
   const combined = await analyzePyraminxImages(completeImages);
-  if (combined.ok) {
-    for (const face of pyraminxFaceIds) {
-      faceColors[face as FaceId] = combined.faces[face];
-    }
-  } else {
-    const analyzedFaces = await Promise.all(
-      pyraminxFaceIds.map(async (face) => ({
-        face,
-        result: await analyzeFaceImage(images[face]!)
-      }))
-    );
+  if (!combined.ok) {
+    return NextResponse.json({ ok: false, code: "analysis_failed", messageSk: combined.messageSk, requiresRescan: true }, { status: 200 });
+  }
 
-    for (const { face, result } of analyzedFaces) {
-      if (!result.ok) {
-        return NextResponse.json({ ok: false, code: "analysis_failed", messageSk: combined.messageSk, requiresRescan: true }, { status: 200 });
-      }
-      faceColors[face as FaceId] = result.colors;
-    }
+  for (const face of pyraminxFaceIds) {
+    faceColors[face as FaceId] = combined.faces[face];
   }
 
   const state = decodeStateFromFaceColors(faceColors);
