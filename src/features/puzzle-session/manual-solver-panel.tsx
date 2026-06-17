@@ -17,7 +17,7 @@ type VisionResult =
 
 type SolveStatus = "idle" | "capturing" | "analyzing" | "solving" | "ready" | "needs_rescan" | "error";
 
-const ANALYSIS_TIMEOUT_MS = 30000;
+const ANALYSIS_TIMEOUT_MS = 15000;
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
@@ -162,8 +162,8 @@ export function PhotoUploadPanel() {
     setMoves(null);
     setScrambleState(null);
     setStatus("analyzing");
-    setMessage("Mam obrazky. Automaticky citam farby a kontrolujem, ci z nich vznikne platny Pyraminx.");
-    speakText("Mam obrazky. Automaticky citam farby.");
+    setMessage("Mam 4 snimky. Teraz z nich citam farby a hladam platny stav Pyraminxu.");
+    speakText("Mam styri snimky. Teraz citam farby.");
 
     let recognized: VisionResult;
     const controller = new AbortController();
@@ -174,8 +174,8 @@ export function PhotoUploadPanel() {
       const aborted = error instanceof DOMException && error.name === "AbortError";
       askForRescan(
         aborted
-          ? "AI nestihla precitat stav. Natoc kratke video alebo ukaz 4 strany znova pomalsie."
-          : "AI neprecitala stav. Natoc kratke video alebo ukaz 4 strany znova pomalsie."
+          ? "AI nestihla precitat stav do 15 sekund. Skus video alebo ukaz 4 strany znova pomalsie a zblizka."
+          : "AI neprecitala stav. Skus video alebo ukaz 4 strany znova pomalsie a zblizka."
       );
       return;
     } finally {
@@ -292,9 +292,12 @@ export function PhotoUploadPanel() {
       {status === "ready" && moves && scrambleState ? (
         <SolveGuide moves={moves as PyraminxMove[]} initialState={scrambleState} onSpeak={speakText} />
       ) : status === "analyzing" || status === "solving" || status === "capturing" ? (
-        <section className="form-status">
-          <strong>Pracujem</strong>
-          <p>AI cita farby. Ked stav sedi, solver vypocita tahy a uvidis presne kroky.</p>
+        <section className="scan-status-panel" aria-live="polite">
+          <strong>{status === "solving" ? "Solver pocita tahy" : status === "capturing" ? "Pripravujem snimky" : "AI cita fotky"}</strong>
+          <p>{message}</p>
+          <div className="scan-loader" aria-hidden="true">
+            <span />
+          </div>
         </section>
       ) : (
         <>
