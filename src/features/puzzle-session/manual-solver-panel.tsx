@@ -16,6 +16,7 @@ type VisionResult =
   | { ok: false; code?: string; messageSk?: string; requiresRescan?: boolean };
 
 type SolveStatus = "idle" | "capturing" | "analyzing" | "solving" | "ready" | "needs_rescan" | "error";
+const ANALYSIS_TIMEOUT_MS = 45000;
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
@@ -28,12 +29,12 @@ async function blobUrlToDataUrl(url: string): Promise<string> {
   });
 }
 
-async function recognizeStateFromPhotos(captures: CapturedFace[]): Promise<VisionResult> {
+async function recognizeStateFromPhotos(captures: CapturedFace[], signal?: AbortSignal): Promise<VisionResult> {
   const images: Partial<Record<PyraminxFaceId, string>> = {};
   for (const capture of captures) {
     images[capture.face] = await blobUrlToDataUrl(capture.url);
   }
-  return postJson<VisionResult>("/api/pyraminx-vision", { images });
+  return postJson<VisionResult>("/api/pyraminx-vision", { images }, signal);
 }
 
 async function computeSolution(state: PyraminxState): Promise<{ moves: string[] | null; status: string }> {
@@ -153,13 +154,22 @@ export function PhotoUploadPanel() {
     speakText("Mam obrazky. Teraz kontrolujem farby na vsetkych styroch stranach.");
 
     let recognized: VisionResult;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
     try {
-      recognized = await recognizeStateFromPhotos(nextCaptures);
-    } catch {
-      setStatus("error");
-      setMessage("AI rozpoznanie zlyhalo. Skus jasnejsie svetlo alebo odfot strany este raz.");
-      speakText("Rozpoznanie zlyhalo. Skus jasnejsie svetlo alebo odfot strany este raz.");
+      recognized = await recognizeStateFromPhotos(nextCaptures, controller.signal);
+    } catch (error) {
+      const aborted = error instanceof DOMException && error.name === "AbortError";
+      setStatus("needs_rescan");
+      setMessage(
+        aborted
+          ? "AI rozpoznanie trva prilis dlho. Skus 4 ostre fotky zblizka, pri dobrom svetle."
+          : "AI rozpoznanie zlyhalo. Skus jasnejsie svetlo alebo odfot strany este raz."
+      );
+      speakText(aborted ? "Trva to prilis dlho. Skus styri ostre fotky zblizka." : "Rozpoznanie zlyhalo. Skus jasnejsie svetlo alebo odfot strany este raz.");
       return;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
 
     if (!recognized.ok) {
@@ -281,7 +291,7 @@ export function PhotoUploadPanel() {
       ) : status === "analyzing" || status === "solving" || status === "capturing" ? (
         <section className="form-status">
           <strong>Pracujem</strong>
-          <p>Najprv overim obrazky. Ak je stav platny, az potom zobrazim tahy solvera.</p>
+          <p>Kontrolujem farby. Ak to potrva dlho, automaticky ti poviem, aby si skusil ostrejsie fotky.</p>
         </section>
       ) : (
         <CameraCapture onComplete={handleCameraComplete} onSpeak={speakText} />
@@ -314,11 +324,12 @@ export function PhotoUploadPanel() {
   );
 }
 
-async function postJson<T>(url: string, body?: unknown): Promise<T> {
+async function postJson<T>(url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
     headers: body !== undefined ? { "content-type": "application/json" } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal
   });
   return response.json() as Promise<T>;
 }
