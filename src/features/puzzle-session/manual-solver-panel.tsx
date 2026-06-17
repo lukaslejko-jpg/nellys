@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import type { PyraminxMove } from "@/lib/domain/pyraminx/moves";
 import type { PyraminxState } from "@/lib/domain/pyraminx/state";
-import { pyraminxFaceIds, type PyraminxFaceId } from "@/lib/domain/pyraminx/media-inspection";
+import { pyraminxFaceIds, stickerColorIds, type PyraminxFaceId, type StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
+import { decodeStateFromFaceColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
 import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/camera-capture";
 import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
@@ -16,7 +17,27 @@ type VisionResult =
   | { ok: false; code?: string; messageSk?: string; requiresRescan?: boolean };
 
 type SolveStatus = "idle" | "capturing" | "analyzing" | "solving" | "ready" | "needs_rescan" | "error";
-const ANALYSIS_TIMEOUT_MS = 45000;
+type ManualColorDraft = Record<PyraminxFaceId, (StickerColorId | null)[]>;
+
+const ANALYSIS_TIMEOUT_MS = 25000;
+
+const COLOR_LABEL: Record<StickerColorId, string> = {
+  red: "Cervena",
+  green: "Zelena",
+  blue: "Modra",
+  yellow: "Zlta"
+};
+
+const COLOR_STYLE: Record<StickerColorId, string> = {
+  red: "var(--red)",
+  green: "var(--green)",
+  blue: "var(--blue)",
+  yellow: "var(--yellow)"
+};
+
+function createManualColorDraft(): ManualColorDraft {
+  return { U: Array(9).fill(null), L: Array(9).fill(null), R: Array(9).fill(null), B: Array(9).fill(null) };
+}
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
@@ -125,6 +146,10 @@ export function PhotoUploadPanel() {
   const [message, setMessage] = useState("Vyber kameru, 4 fotky alebo kratke video. Nellys potom povie dalsi krok.");
   const [status, setStatus] = useState<SolveStatus>("idle");
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualFace, setManualFace] = useState<PyraminxFaceId>("U");
+  const [selectedColor, setSelectedColor] = useState<StickerColorId>("red");
+  const [manualColors, setManualColors] = useState<ManualColorDraft>(() => createManualColorDraft());
 
   function speakText(text: string) {
     if (!soundEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -141,6 +166,9 @@ export function PhotoUploadPanel() {
     setMoves(null);
     setScrambleState(null);
     setStatus("idle");
+    setManualMode(false);
+    setManualColors(createManualColorDraft());
+    setManualFace("U");
     setMessage("Vyber kameru, 4 fotky alebo kratke video. Nellys potom povie dalsi krok.");
   }
 
@@ -149,6 +177,8 @@ export function PhotoUploadPanel() {
     setCaptures(nextCaptures);
     setMoves(null);
     setScrambleState(null);
+    setManualMode(false);
+    setManualColors(createManualColorDraft());
     setStatus("analyzing");
     setMessage("Mam obrazky. Teraz kontrolujem farby na vsetkych styroch stranach.");
     speakText("Mam obrazky. Teraz kontrolujem farby na vsetkych styroch stranach.");
@@ -161,12 +191,13 @@ export function PhotoUploadPanel() {
     } catch (error) {
       const aborted = error instanceof DOMException && error.name === "AbortError";
       setStatus("needs_rescan");
+      setManualMode(true);
       setMessage(
         aborted
-          ? "AI rozpoznanie trva prilis dlho. Skus 4 ostre fotky zblizka, pri dobrom svetle."
-          : "AI rozpoznanie zlyhalo. Skus jasnejsie svetlo alebo odfot strany este raz."
+          ? "AI nestihla rozpoznat farby. Teraz ich vyber rucne na snimkach a ja potom pustim solver."
+          : "AI rozpoznanie zlyhalo. Vyber farby rucne na snimkach a ja potom pustim solver."
       );
-      speakText(aborted ? "Trva to prilis dlho. Skus styri ostre fotky zblizka." : "Rozpoznanie zlyhalo. Skus jasnejsie svetlo alebo odfot strany este raz.");
+      speakText("AI nestihla rozpoznat farby. Vyber farby rucne na snimkach a potom spustim solver.");
       return;
     } finally {
       window.clearTimeout(timeoutId);
@@ -174,8 +205,9 @@ export function PhotoUploadPanel() {
 
     if (!recognized.ok) {
       setStatus("needs_rescan");
-      setMessage(recognized.messageSk ?? "Neviem z fotiek poskladat platny stav. Odfot strany znova pomalsie a ostrejsie.");
-      speakText("Neviem z fotiek poskladat platny stav. Odfot strany znova pomalsie a ostrejsie.");
+      setManualMode(true);
+      setMessage("AI nevie stav spolahlivo precitat. Vyber farby rucne na snimkach a solver vypocita tahy.");
+      speakText("AI nevie stav spolahlivo precitat. Vyber farby rucne na snimkach a potom spustim solver.");
       return;
     }
 
@@ -250,6 +282,52 @@ export function PhotoUploadPanel() {
     }
   }
 
+  function setManualSticker(face: PyraminxFaceId, index: number, color: StickerColorId) {
+    setManualColors((current) => ({
+      ...current,
+      [face]: current[face].map((value, valueIndex) => (valueIndex === index ? color : value))
+    }));
+  }
+
+  function missingManualStickerCount() {
+    return pyraminxFaceIds.reduce((count, face) => count + manualColors[face].filter((color) => color === null).length, 0);
+  }
+
+  async function solveFromManualColors() {
+    const missing = missingManualStickerCount();
+    if (missing > 0) {
+      setStatus("needs_rescan");
+      setMessage(`Este chyba ${missing} farebnych policok. Vyfarbi vsetky trojuholniky na styroch stranach.`);
+      speakText("Este chybaju farby. Vyfarbi vsetky trojuholniky na styroch stranach.");
+      return;
+    }
+
+    const faceColors = manualColors as Record<FaceId, StickerColorId[]>;
+    const state = decodeStateFromFaceColors(faceColors);
+    if (!state) {
+      setStatus("needs_rescan");
+      setMessage("Tieto farby nevytvaraju platny Pyraminx. Skontroluj najma hrany a skus opravit farby.");
+      speakText("Tieto farby nevytvaraju platny Pyraminx. Skontroluj farby a skus ich opravit.");
+      return;
+    }
+
+    setStatus("solving");
+    setMessage("Farby sedia. Teraz pocitam riesenie solverom.");
+    speakText("Farby sedia. Teraz pocitam riesenie solverom.");
+    const solved = await computeSolution(state);
+    if (!solved.moves) {
+      setStatus("error");
+      setMessage(solved.status);
+      return;
+    }
+
+    setMoves(solved.moves);
+    setScrambleState(state);
+    setManualMode(false);
+    setStatus("ready");
+    setMessage(solved.moves.length === 0 ? "Hotovo. Tento Pyraminx je uz vyrieseny." : "Riesenie je pripravene. Rob kroky zhora nadol, jeden po druhom.");
+  }
+
   return (
     <div className="manual-solver">
       <section className="ai-guide primary-guide" aria-live="polite">
@@ -288,10 +366,59 @@ export function PhotoUploadPanel() {
 
       {status === "ready" && moves && scrambleState ? (
         <SolveGuide moves={moves as PyraminxMove[]} initialState={scrambleState} onSpeak={speakText} />
+      ) : manualMode && captures.length > 0 ? (
+        <section className="ai-guide manual-color-panel">
+          <div>
+            <strong>Rucne potvrdenie farieb</strong>
+            <p>Vyber farbu a tukni 9 trojuholnikov na strane {manualFace}. Potom prejdi na dalsiu stranu.</p>
+          </div>
+          <div className="face-tabs">
+            {pyraminxFaceIds.map((face) => (
+              <button className={manualFace === face ? "face-tab active" : "face-tab"} key={face} onClick={() => setManualFace(face)} type="button">
+                {face} ({manualColors[face].filter(Boolean).length}/9)
+              </button>
+            ))}
+          </div>
+          <div className="manual-photo-row">
+            {captures.find((capture) => capture.face === manualFace) ? (
+              <img src={captures.find((capture) => capture.face === manualFace)!.url} alt={`Strana ${manualFace}`} />
+            ) : null}
+          </div>
+          <div className="manual-palette">
+            {stickerColorIds.map((color) => (
+              <button
+                className={selectedColor === color ? "manual-swatch active" : "manual-swatch"}
+                key={color}
+                onClick={() => setSelectedColor(color)}
+                style={{ background: COLOR_STYLE[color] }}
+                type="button"
+              >
+                {COLOR_LABEL[color]}
+              </button>
+            ))}
+          </div>
+          <div className="manual-sticker-grid" aria-label={`Farby strany ${manualFace}`}>
+            {manualColors[manualFace].map((color, index) => (
+              <button
+                className="manual-sticker"
+                key={`${manualFace}-${index}`}
+                onClick={() => setManualSticker(manualFace, index, selectedColor)}
+                style={{ background: color ? COLOR_STYLE[color] : "#ffffff" }}
+                type="button"
+              >
+                {index + 1}
+              </button>
+            ))}
+          </div>
+          <button className="button" onClick={solveFromManualColors} type="button">
+            Vypocitat z oznacenych farieb
+          </button>
+          <p className="form-status">Chyba este {missingManualStickerCount()} policok. AI nevymysla tahy; solver ich vypocita az po platnom stave.</p>
+        </section>
       ) : status === "analyzing" || status === "solving" || status === "capturing" ? (
         <section className="form-status">
           <strong>Pracujem</strong>
-          <p>Kontrolujem farby. Ak to potrva dlho, automaticky ti poviem, aby si skusil ostrejsie fotky.</p>
+          <p>Kontrolujem farby. Ak AI nestihne odpovedat, prejdem na rucne potvrdenie farieb.</p>
         </section>
       ) : (
         <CameraCapture onComplete={handleCameraComplete} onSpeak={speakText} />
