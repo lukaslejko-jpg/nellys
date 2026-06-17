@@ -15,6 +15,8 @@ Strana je rozdelená na 9 malých trojuholníkov v 3 radoch:
 Každý dielik má jednu zo 4 farieb: red, green, blue, yellow.
 Vráť IBA JSON v tvare {"colors": ["<farba0>", "<farba1>", ..., "<farba8>"]} - presne 9 hodnôt v poradí pozícií 0-8, bez akéhokoľvek ďalšieho textu.`;
 
+const DEFAULT_OPENROUTER_VISION_MODEL = "nex-agi/nex-n2-pro:free";
+
 function extractJson(text: string): unknown {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -44,6 +46,7 @@ function parseColors(text: string): AnalyzeFaceResult {
 }
 
 async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<AnalyzeFaceResult> {
+  const model = process.env.OPENROUTER_VISION_MODEL ?? DEFAULT_OPENROUTER_VISION_MODEL;
   let response: Response;
   try {
     response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -53,8 +56,9 @@ async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<A
         authorization: `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "mistralai/mistral-small-3.1-24b-instruct:free",
+        model,
         max_tokens: 256,
+        temperature: 0,
         messages: [
           {
             role: "user",
@@ -71,8 +75,10 @@ async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<A
   }
 
   if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (OpenRouter ${response.status}): ${errText.slice(0, 200)}` };
+    return {
+      ok: false,
+      messageSk: `OpenRouter vision model nie je teraz dostupný (${response.status}). Skús znova o chvíľu alebo nahraj jasnejšie fotky.`
+    };
   }
 
   const body = (await response.json()) as { choices?: { message?: { content?: string } }[] };
@@ -102,8 +108,10 @@ async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: 
   }
 
   if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    return { ok: false, messageSk: `AI rozpoznávanie fotiek zlyhalo (Gemini ${response.status}): ${errText.slice(0, 200)}` };
+    return {
+      ok: false,
+      messageSk: `Gemini vision model nie je teraz dostupný (${response.status}). Skús znova o chvíľu alebo použi 4 fotky.`
+    };
   }
 
   const body = (await response.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
@@ -143,5 +151,11 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
     errors.push(result.messageSk);
   }
 
-  return { ok: false, messageSk: errors.join(" | ") || result.messageSk };
+  return {
+    ok: false,
+    messageSk:
+      errors[0] ??
+      result.messageSk ??
+      "AI rozpoznanie zlyhalo. Skús 4 jasné fotky pri dobrom svetle."
+  };
 }
