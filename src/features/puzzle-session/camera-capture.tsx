@@ -5,20 +5,20 @@ import { pyraminxFaceIds, type PyraminxFaceId } from "@/lib/domain/pyraminx/medi
 
 const FACE_PROMPTS: Record<PyraminxFaceId, { title: string; body: string }> = {
   U: {
-    title: "Ukáž hornú stranu 👀",
-    body: "Drž ihlan špičkou hore a polož prvú stranu do trojuholníka."
+    title: "Ukaz prvu celu stranu",
+    body: "Drz ihlan spickou hore. Cela farebna strana musi byt v trojuholniku."
   },
   L: {
-    title: "Teraz otoč doľava ⬅️",
-    body: "Pomaly otoč ihlan a ukáž ďalšiu stranu do trojuholníka."
+    title: "Pomaly otoc na dalsiu stranu",
+    body: "Nechaj spicku hore. Ukaz dalsiu celu farebnu stranu a chvilu stoj."
   },
   R: {
-    title: "Super! Otoč doprava ➡️",
-    body: "Ešte jedna strana - vlož ju presne do trojuholníka."
+    title: "Este jedna strana",
+    body: "Pomaly otoc ihlan. Daj celu stranu do trojuholnika, nie iba roh."
   },
   B: {
-    title: "Posledná strana 🎉",
-    body: "Otoč ihlan naposledy a zarovnaj poslednú stranu."
+    title: "Posledna strana",
+    body: "Ukaz poslednu celu stranu. Potom Nellys automaticky skontroluje stav."
   }
 };
 
@@ -53,7 +53,7 @@ export function CameraCapture({
           await videoRef.current.play();
         }
       } catch {
-        setError("Nepodarilo sa spustiť kameru. Povoľ prístup ku kamere v prehliadači.");
+        setError("Kamera sa nespustila. Povol pristup ku kamere alebo nahraj 4 fotky/video.");
       }
     }
 
@@ -135,10 +135,10 @@ export function CameraCapture({
       ) : null}
       <div className="solver-actions">
         <button className="button" onClick={captureFrame} type="button" disabled={!!error}>
-          Odfotiť a pokračovať
+          Odfotit a pokracovat
         </button>
         <button className="button secondary" onClick={restart} type="button">
-          Začať znova
+          Zacat znova
         </button>
       </div>
     </div>
