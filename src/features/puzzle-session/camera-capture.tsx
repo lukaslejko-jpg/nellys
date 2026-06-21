@@ -197,23 +197,6 @@ export function CameraCapture({
     const sy = (video.videoHeight - size) / 2;
     ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
 
-    const quality = measurePyraminxInGuide(ctx, size);
-    if (!manual && !quality.ready) {
-      stableProgressRef.current = 0;
-      setGuidance({
-        state: quality.largeEnough ? "center" : "search",
-        title: quality.largeEnough ? "Daj ihlan do stredu" : "Este neodfotim",
-        detail: quality.largeEnough
-          ? "Cela farebna strana musi byt v strede zlteho trojuholnika."
-          : "Vidim len cast alebo malo farieb. Ukaz vacsiu celu stranu bez prsta.",
-        progress: 0
-      });
-      window.setTimeout(() => {
-        autoCaptureLockRef.current = false;
-      }, 500);
-      return;
-    }
-
     canvas.toBlob((blob) => {
       if (!blob) {
         autoCaptureLockRef.current = false;
