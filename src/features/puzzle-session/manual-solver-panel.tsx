@@ -17,17 +17,47 @@ type VisionResult =
 
 type SolveStatus = "idle" | "capturing" | "analyzing" | "solving" | "ready" | "needs_rescan" | "error";
 
-const ANALYSIS_TIMEOUT_MS = 25000;
+const ANALYSIS_TIMEOUT_MS = 60000;
 const SOLVER_TIMEOUT_MS = 15000;
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
   const blob = await response.blob();
+  const compressed = await compressImageBlob(blob);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = reject;
-    reader.readAsDataURL(blob);
+    reader.readAsDataURL(compressed);
+  });
+}
+
+async function compressImageBlob(blob: Blob): Promise<Blob> {
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = await loadImage(objectUrl);
+    const maxSize = 512;
+    const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return blob;
+    ctx.drawImage(image, 0, 0, width, height);
+    return (await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72))) ?? blob;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
   });
 }
 
@@ -125,14 +155,14 @@ async function extractVideoFrames(file: File): Promise<CapturedFace[]> {
       video.currentTime = Math.min(duration - 0.05, Math.max(0, time));
       await waitForVideoEvent(video, "seeked");
 
-      const size = Math.min(video.videoWidth, video.videoHeight) || 720;
+      const size = Math.min(video.videoWidth, video.videoHeight, 512) || 512;
       canvas.width = size;
       canvas.height = size;
       const sx = Math.max(0, (video.videoWidth - size) / 2);
       const sy = Math.max(0, (video.videoHeight - size) / 2);
       ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
 
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
       if (!blob) throw new Error("frame_error");
       captures.push({ face: pyraminxFaceIds[index], url: URL.createObjectURL(blob) });
     }
@@ -199,7 +229,7 @@ export function PhotoUploadPanel() {
     setMoves(null);
     setScrambleState(null);
     setStatus("analyzing");
-    setMessage("Mam 4 snimky. Gemini cita farby. Cakam najviac 25 sekund.");
+    setMessage("Mam 4 snimky. Zmensujem ich a Gemini cita farby. Cakam najviac 60 sekund.");
     speakText("Mam snimky. Citam farby.");
 
     const controller = new AbortController();
@@ -209,7 +239,7 @@ export function PhotoUploadPanel() {
       recognized = await recognizeStateFromPhotos(nextCaptures, controller.signal);
     } catch (error) {
       if (activeJobRef.current !== jobId) return;
-      askForRescan(isAbortError(error) ? "Gemini nestihla precitat stav do 25 sekund. Skus video alebo 4 ostre fotky zblizka." : undefined);
+      askForRescan(isAbortError(error) ? "Gemini nestihla precitat stav do 60 sekund. Skus 4 ostre fotky zblizka alebo kratke video." : undefined);
       return;
     } finally {
       window.clearTimeout(timeoutId);
