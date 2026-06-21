@@ -27,11 +27,15 @@ Kazda strana je rozdelena na 9 malych trojuholnikov v 3 radoch:
 - riadok 2 (spodny): 5 dielikov zlava doprava [pozicie 4, 5, 6, 7, 8]
 
 Kazdy dielik ma jednu zo 4 farieb: red, green, blue, yellow.
+Vsetky 4 fotky patria k tomu istemu Pyraminxu, preto musi byt spolu presne 9 red, 9 green, 9 blue a 9 yellow.
+Ak je niektora fotka mierne otocena, stale citaj dieliky podla viditelnej trojuholnikovej strany zhora nadol a zlava doprava.
+Ak je prst alebo tien mimo farebnej nalepky, ignoruj ho. Ak je nalepka ciastocne prekryta, pouzi farbu viditelnej casti tej istej nalepky.
 Neries hlavolam a nevymyslaj tahy. Iba precitaj farby nalepiek.
 Vrat IBA JSON v tvare:
 {"faces":{"U":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"],"L":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"],"R":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"],"B":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"]}}.`;
 
 const DEFAULT_OPENROUTER_VISION_MODEL = "nex-agi/nex-n2-pro:free";
+const DEFAULT_GEMINI_VISION_MODEL = "gemini-2.0-flash";
 
 function extractJson(text: string): unknown {
   const match = text.match(/\{[\s\S]*\}/);
@@ -174,10 +178,11 @@ async function analyzeFacesWithOpenRouter(apiKey: string, images: Record<Pyramin
 }
 
 async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: string): Promise<AnalyzeFaceResult> {
+  const model = process.env.GEMINI_VISION_MODEL ?? DEFAULT_GEMINI_VISION_MODEL;
   let response: Response;
   try {
     response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -203,6 +208,7 @@ async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: 
 }
 
 async function analyzeFacesWithGemini(apiKey: string, images: Record<PyraminxFaceId, string>): Promise<AnalyzeFacesResult> {
+  const model = process.env.GEMINI_VISION_MODEL ?? DEFAULT_GEMINI_VISION_MODEL;
   const parts: ({ text: string } | { inline_data: { mime_type: string; data: string } })[] = [{ text: MULTI_FACE_PROMPT }];
 
   for (const face of pyraminxFaceIds) {
@@ -215,7 +221,7 @@ async function analyzeFacesWithGemini(apiKey: string, images: Record<PyraminxFac
   let response: Response;
   try {
     response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
