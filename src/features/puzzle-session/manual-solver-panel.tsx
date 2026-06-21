@@ -73,6 +73,48 @@ async function recognizeStateLocally(captures: CapturedFace[]): Promise<VisionRe
   return { ok: true, state };
 }
 
+async function normalizeCaptures(captures: CapturedFace[]): Promise<CapturedFace[]> {
+  return Promise.all(
+    captures.map(async (capture) => ({
+      ...capture,
+      url: await normalizeCaptureUrl(capture.url)
+    }))
+  );
+}
+
+async function normalizeCaptureUrl(url: string): Promise<string> {
+  const image = await loadImage(url);
+  const size = Math.min(image.naturalWidth, image.naturalHeight);
+  if (!size) return url;
+
+  const source = document.createElement("canvas");
+  source.width = size;
+  source.height = size;
+  const sourceCtx = source.getContext("2d", { willReadFrequently: true });
+  if (!sourceCtx) return url;
+
+  const sx = Math.max(0, (image.naturalWidth - size) / 2);
+  const sy = Math.max(0, (image.naturalHeight - size) / 2);
+  sourceCtx.drawImage(image, sx, sy, size, size, 0, 0, size, size);
+
+  const bounds = detectColoredBounds(sourceCtx, size);
+  if (!bounds) return url;
+
+  const outputSize = 720;
+  const output = document.createElement("canvas");
+  output.width = outputSize;
+  output.height = outputSize;
+  const outputCtx = output.getContext("2d");
+  if (!outputCtx) return url;
+
+  outputCtx.fillStyle = "#ffffff";
+  outputCtx.fillRect(0, 0, outputSize, outputSize);
+  outputCtx.drawImage(source, bounds.left, bounds.top, bounds.size, bounds.size, 0, 0, outputSize, outputSize);
+
+  const blob = await new Promise<Blob | null>((resolve) => output.toBlob(resolve, "image/jpeg", 0.94));
+  return blob ? URL.createObjectURL(blob) : url;
+}
+
 function buildFaceAssignments(): FaceId[][] {
   const faces = [...pyraminxFaceIds] as FaceId[];
   const result: FaceId[][] = [];
@@ -160,12 +202,12 @@ function detectColoredBounds(ctx: CanvasRenderingContext2D, size: number): { lef
     }
   }
 
-  if (count < 80 || maxX <= minX || maxY <= minY) return null;
+  if (count < 24 || maxX <= minX || maxY <= minY) return null;
 
   const width = maxX - minX;
   const height = maxY - minY;
   const boxSize = Math.max(width, height);
-  const padding = Math.round(boxSize * 0.08);
+  const padding = Math.round(boxSize * 0.14);
   const finalSize = Math.min(size, boxSize + padding * 2);
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
@@ -240,7 +282,7 @@ function scoreRecognizableFrame(ctx: CanvasRenderingContext2D, size: number): nu
   const bounds = detectColoredBounds(ctx, size);
   if (!bounds) return 0;
   const relativeSize = bounds.size / size;
-  return relativeSize >= 0.38 ? relativeSize : 0;
+  return relativeSize;
 }
 
 async function computeSolution(state: PyraminxState, signal?: AbortSignal): Promise<{ moves: string[] | null; status: string }> {
@@ -286,7 +328,7 @@ function toUserRescanMessage(text?: string): string {
 }
 
 async function fileToObjectUrl(file: File): Promise<string> {
-  return URL.createObjectURL(file);
+  return URL.createObjectUrL(file);
 }
 
 function waitForVideoEvent(video: HTMLVideoElement, eventName: keyof HTMLMediaElementEventMap): Promise<void> {
@@ -341,10 +383,10 @@ async function extractVideoFrames(file: File): Promise<CapturedFace[]> {
         const sy = Math.max(0, (video.videoHeight - size) / 2);
         ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
 
-        const score = scoreRecognizableFrame(ctx, size);
-        if (score <= bestScore) continue;
         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
         if (!blob) continue;
+        const score = scoreRecognizableFrame(ctx, size);
+        if (score < bestScore && bestBlob) continue;
         bestScore = score;
         bestBlob = blob;
       }
@@ -406,21 +448,22 @@ export function PhotoUploadPanel() {
     const jobId = activeJobRef.current + 1;
     activeJobRef.current = jobId;
     captures.forEach((capture) => URL.revokeObjectURL(capture.url));
-    setCaptures(nextCaptures);
+    const preparedCaptures = await normalizeCaptures(nextCaptures);
+    setCaptures(preparedCaptures);
     setMoves(null);
     setScrambleState(null);
     setStatus("analyzing");
-    setMessage("Mam obrazky. Najprv citam farby priamo v telefone. Ak to neprejde, skusim AI.");
+    setMessage("Mam obrazky. Najprv opravim snimky, potom citam farby. Ak to neprejde, skusim AI.");
     speakText("Mam obrazky. Citam farby.");
 
-    let recognized = await recognizeStateLocally(nextCaptures);
+    let recognized = await recognizeStateLocally(preparedCaptures);
     const localMessage = recognized.ok ? "" : recognized.messageSk;
     if (!recognized.ok) {
       setMessage("Lokalne citanie nestacilo. Skusam AI rozpoznanie, najviac 8 sekund.");
       const controller = new AbortController();
       const timeoutId = window.setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
       try {
-        recognized = await recognizeStateFromPhotos(nextCaptures, controller.signal);
+        recognized = await recognizeStateFromPhotos(preparedCaptures, controller.signal);
       } catch (error) {
         if (activeJobRef.current !== jobId) return;
         const aborted = isAbortError(error);
