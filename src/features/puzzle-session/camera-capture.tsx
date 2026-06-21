@@ -38,6 +38,8 @@ const DEFAULT_GUIDANCE: VisualGuidance = {
   progress: 0
 };
 
+const STEP_ARM_DELAY_MS = 2600;
+
 type FocusTrackCapabilities = MediaTrackCapabilities & {
   focusMode?: string[];
 };
@@ -219,7 +221,7 @@ export function CameraCapture({
         } else {
           onComplete(next);
         }
-      }, 450);
+      }, 900);
     }, "image/jpeg", 0.92);
   }
 
@@ -286,7 +288,9 @@ export function CameraCapture({
           const quality = measurePyraminxInGuide(ctx, sampleSize);
           const centered = quality.centered;
           const largeEnough = quality.largeEnough || fullCoverage > 0.08;
-          const ready = centered && largeEnough && performance.now() - stepStartedAtRef.current > 900;
+          const now = performance.now();
+          const stepArmed = now - stepStartedAtRef.current > STEP_ARM_DELAY_MS;
+          const ready = centered && largeEnough && stepArmed;
 
           let next: VisualGuidance;
           if (!largeEnough) {
@@ -305,8 +309,16 @@ export function CameraCapture({
               detail: "Cela farebna strana musi sediet v strede zlteho trojuholnika.",
               progress: stableProgressRef.current
             };
+          } else if (!stepArmed) {
+            stableProgressRef.current = 0;
+            next = {
+              state: "center",
+              title: stepIndex === 0 ? "Priprav prvu stranu" : "Otoc na dalsiu stranu",
+              detail: "Mas cas. Daj celu farebnu stranu do trojuholnika, potom ju chvilu drz.",
+              progress: 0
+            };
           } else {
-            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.08);
+            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.045);
             next = {
               state: "hold",
               title: autoCaptureEnabled ? "Drz takto" : "Vyzera to dobre",
@@ -315,7 +327,6 @@ export function CameraCapture({
             };
           }
 
-          const now = performance.now();
           if (now - lastUiUpdateRef.current > 120 || ready) {
             lastUiUpdateRef.current = now;
             setGuidance(next);
