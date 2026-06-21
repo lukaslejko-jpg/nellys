@@ -145,9 +145,11 @@ async function extractVideoFrames(file: File): Promise<CapturedFace[]> {
 function toUserRescanMessage(text?: string): string {
   if (!text) return "AI z tychto snimok este nevie urobit platny stav. Skus 4 jasne cele strany zblizka.";
   if (/quota|429/i.test(text)) return "Gemini limit je docasne vycerpany. Skus znovu neskor alebo nastav iny Gemini API kluc.";
-  if (/API|model|Gemini|OpenRouter|404/i.test(text)) return "AI rozpoznanie teraz neodpovedalo pouzitelne. Skus znova alebo nahraj kratsie video.";
+  if (/GEMINI_API_KEY|quota|429|404|model|Gemini|OpenRouter|API/i.test(text)) return text;
   if (/platny|Farby|decode/i.test(text)) return "Farby nedavaju platny Pyraminx stav. Ukaz kazdu zo 4 stran samostatne, rovno, zblizka a bez prstov cez nalepky.";
-  return text;
+  return text.includes("AI rozpoznanie teraz neodpovedalo pouzitelne")
+    ? "Rozpoznavanie zlyhalo u poskytovatela. Skontroluj Vercel logs alebo kluc pre rozpoznavanie."
+    : text;
 }
 
 export function PhotoUploadPanel() {
