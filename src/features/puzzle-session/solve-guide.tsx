@@ -15,43 +15,36 @@ const STICKER_COLOR: Record<StickerColorId, string> = {
 };
 
 type FaceKey = "top" | "left" | "right" | "center";
+type ViewMode = "camera" | "model" | "steps";
 
 const FACES: Record<
   FaceKey,
   { points: [number, number][]; apexIdx: number; faceId: FaceId; labelPos: [number, number]; label: string }
 > = {
   top: { points: [[50, 8], [72, 48], [28, 48]], apexIdx: 0, faceId: "U", labelPos: [50, 30], label: "HORE" },
-  left: { points: [[28, 48], [50, 88], [6, 88]], apexIdx: 2, faceId: "L", labelPos: [28, 70], label: "VĽAVO" },
+  left: { points: [[28, 48], [50, 88], [6, 88]], apexIdx: 2, faceId: "L", labelPos: [28, 70], label: "VLAVO" },
   right: { points: [[72, 48], [94, 88], [50, 88]], apexIdx: 1, faceId: "R", labelPos: [72, 70], label: "VPRAVO" },
-  center: { points: [[28, 48], [72, 48], [50, 88]], apexIdx: 2, faceId: "B", labelPos: [50, 65], label: "VZADU (k tebe)" }
+  center: { points: [[28, 48], [72, 48], [50, 88]], apexIdx: 2, faceId: "B", labelPos: [50, 65], label: "K TEBE" }
 };
 
 const FACE_INFO: Record<string, { label: string; face: FaceKey; color: string }> = {
   U: { label: "hornom vrchole", face: "top", color: "var(--blue)" },
   u: { label: "malom hornom vrchole", face: "top", color: "var(--blue)" },
-  L: { label: "ľavom vrchole", face: "left", color: "var(--green)" },
-  l: { label: "malom ľavom vrchole", face: "left", color: "var(--green)" },
+  L: { label: "lavom vrchole", face: "left", color: "var(--green)" },
+  l: { label: "malom lavom vrchole", face: "left", color: "var(--green)" },
   R: { label: "pravom vrchole", face: "right", color: "var(--red)" },
   r: { label: "malom pravom vrchole", face: "right", color: "var(--red)" },
   B: { label: "zadnom vrchole", face: "center", color: "var(--yellow)" },
   b: { label: "malom zadnom vrchole", face: "center", color: "var(--yellow)" }
 };
 
-function gridPoint(
-  a: [number, number],
-  b: [number, number],
-  c: [number, number],
-  i: number,
-  j: number
-): [number, number] {
+function gridPoint(a: [number, number], b: [number, number], c: [number, number], i: number, j: number): [number, number] {
   const w0 = 1 - i / 3 - j / 3;
   const w1 = i / 3;
   const w2 = j / 3;
   return [a[0] * w0 + b[0] * w1 + c[0] * w2, a[1] * w0 + b[1] * w1 + c[1] * w2];
 }
 
-// Splits a triangular face into 9 small triangles, like a real Pyraminx face.
-// Cell 0 is the apex corner; the layout follows faceStickerColors' indexing.
 function subdivideFace(points: [number, number][], apexIdx: number): [number, number][][] {
   const a = points[apexIdx];
   const [b, c] = [0, 1, 2].filter((i) => i !== apexIdx).map((i) => points[i]);
@@ -86,8 +79,8 @@ export function describeMove(move: PyraminxMove): string {
   const face = baseFace(move);
   const info = FACE_INFO[face];
   const ccw = move.endsWith("'");
-  const direction = ccw ? "proti smeru hodinových ručičiek" : "v smere hodinových ručičiek";
-  return `Otoč ${info.label} ${direction}.`;
+  const direction = ccw ? "proti smeru hodinovych ruciciek" : "v smere hodinovych ruciciek";
+  return `Otoc ${info.label} ${direction}.`;
 }
 
 export function SolveGuide({
@@ -102,6 +95,7 @@ export function SolveGuide({
   const [stepIndex, setStepIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
+  const [viewMode, setViewMode] = useState<ViewMode>("model");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const total = moves.length;
   const move = moves[stepIndex];
@@ -109,14 +103,12 @@ export function SolveGuide({
   const ccw = move?.endsWith("'") ?? false;
 
   const baseState = initialState ?? createSolvedState();
-  const stateAtStep = useMemo(
-    () => applySequence(baseState, moves.slice(0, stepIndex)),
-    [baseState, moves, stepIndex]
-  );
+  const stateAtStep = useMemo(() => applySequence(baseState, moves.slice(0, stepIndex)), [baseState, moves, stepIndex]);
 
   useEffect(() => {
     setStepIndex(0);
     setPlaying(false);
+    setViewMode("model");
   }, [moves]);
 
   useEffect(() => {
@@ -158,10 +150,27 @@ export function SolveGuide({
 
   return (
     <div className="solve-guide">
+      <div className="solve-mode-tabs" aria-label="Zobrazenie riesenia">
+        <button className={viewMode === "camera" ? "solve-mode-tab active" : "solve-mode-tab"} onClick={() => setViewMode("camera")} type="button">
+          Kamera
+        </button>
+        <button className={viewMode === "model" ? "solve-mode-tab active" : "solve-mode-tab"} onClick={() => setViewMode("model")} type="button">
+          Model
+        </button>
+        <button className={viewMode === "steps" ? "solve-mode-tab active" : "solve-mode-tab"} onClick={() => setViewMode("steps")} type="button">
+          Kroky
+        </button>
+      </div>
+
       <p className="solve-orientation-hint">
-        Drž pyraminx tak, aby jeden vrchol smeroval hore a jedna stena bola otočená priamo k tebe (VZADU).
+        Drz Pyraminx spickou hore. Model ukazuje, ktoru cast mas teraz otocit.
       </p>
+
       <div className="solve-stage">
+        <div className="solve-model-title">
+          <span>Krok {stepIndex + 1} / {total}</span>
+          <strong>{viewMode === "camera" ? "Porovnaj s realnym ihlanom" : viewMode === "steps" ? "Rob tahy postupne" : "Simulacia modelu"}</strong>
+        </div>
         <svg className="solve-triangle" viewBox="0 0 100 100" aria-hidden="true">
           {(Object.keys(FACES) as FaceKey[]).map((key) => {
             const face = FACES[key];
@@ -188,7 +197,7 @@ export function SolveGuide({
                       dominantBaseline="central"
                       style={{ transformOrigin: `${centroid(cells[0])[0]}px ${centroid(cells[0])[1]}px` }}
                     >
-                      {ccw ? "↺" : "↻"}
+                      {ccw ? "CCW" : "CW"}
                     </text>
                   </>
                 ) : null}
@@ -206,7 +215,7 @@ export function SolveGuide({
         <strong>{move}{turnCount(move) === 2 ? " (dvakrat)" : ""}</strong>
         <p>
           <span className="solve-color-dot" style={{ background: info?.color }} aria-hidden="true" />
-          {describeMove(move)} {ccw ? "Otáčaj proti smeru hodinových ručičiek (doľava) ↺." : "Otáčaj v smere hodinových ručičiek (doprava) ↻."}
+          {describeMove(move)} {ccw ? "Otacaj dolava." : "Otacaj doprava."}
         </p>
       </div>
 
@@ -217,7 +226,7 @@ export function SolveGuide({
           onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
           type="button"
         >
-          ◀ Spat
+          Spat
         </button>
         <button className="button" onClick={() => setPlaying((current) => !current)} type="button">
           {playing ? "Pauza" : "Prehrat"}
@@ -228,7 +237,7 @@ export function SolveGuide({
           onClick={() => setStepIndex((current) => Math.min(total - 1, current + 1))}
           type="button"
         >
-          Dalej ▶
+          Dalej
         </button>
       </div>
 
@@ -245,7 +254,7 @@ export function SolveGuide({
         ))}
       </div>
 
-      <details className="all-guide-steps">
+      <details className="all-guide-steps" open={viewMode === "steps"}>
         <summary>Zobrazit vsetky kroky ({total})</summary>
         <ol className="guide-steps">
           {moves.map((stepMove, index) => (
@@ -260,7 +269,7 @@ export function SolveGuide({
               >
                 <span>{index + 1}</span>
                 <p>
-                  {stepMove} — {describeMove(stepMove)}
+                  {stepMove} - {describeMove(stepMove)}
                 </p>
               </button>
             </li>
