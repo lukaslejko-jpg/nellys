@@ -120,13 +120,13 @@ async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<A
       })
     });
   } catch {
-    return { ok: false, messageSk: "Nepodarilo sa spojit s AI rozpoznavanim fotiek." };
+    return { ok: false, messageSk: "Nepodarilo sa spojit s rozpoznavanim fotiek." };
   }
 
   if (!response.ok) {
     return {
       ok: false,
-      messageSk: `OpenRouter vision model nie je teraz dostupny (${response.status}). Skus znova o chvilu alebo nahraj jasnejsie fotky.`
+      messageSk: `Rozpoznavanie cez zalozny provider vratilo HTTP ${response.status}. Skus znova o chvilu alebo nahraj jasnejsie fotky.`
     };
   }
 
@@ -163,13 +163,13 @@ async function analyzeFacesWithOpenRouter(apiKey: string, images: Record<Pyramin
       })
     });
   } catch {
-    return { ok: false, messageSk: "Nepodarilo sa spojit s AI rozpoznavanim fotiek." };
+    return { ok: false, messageSk: "Nepodarilo sa spojit s rozpoznavanim fotiek." };
   }
 
   if (!response.ok) {
     return {
       ok: false,
-      messageSk: `OpenRouter vision model nie je teraz dostupny (${response.status}). Skus znova o chvilu alebo nahraj jasnejsie fotky.`
+      messageSk: `Rozpoznavanie cez zalozny provider vratilo HTTP ${response.status}. Skus znova o chvilu alebo nahraj jasnejsie fotky.`
     };
   }
 
@@ -192,13 +192,13 @@ async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: 
       }
     );
   } catch {
-    return { ok: false, messageSk: "Nepodarilo sa spojit s AI rozpoznavanim fotiek." };
+    return { ok: false, messageSk: "Nepodarilo sa spojit s rozpoznavanim fotiek." };
   }
 
   if (!response.ok) {
     return {
       ok: false,
-      messageSk: `Gemini vision model nie je teraz dostupny (${response.status}). Skus znova o chvilu alebo pouzi 4 fotky.`
+      messageSk: `Hlavne rozpoznavanie vratilo HTTP ${response.status}. Skus znova o chvilu alebo pouzi 4 fotky.`
     };
   }
 
@@ -229,13 +229,13 @@ async function analyzeFacesWithGemini(apiKey: string, images: Record<PyraminxFac
       }
     );
   } catch {
-    return { ok: false, messageSk: "Nepodarilo sa spojit s AI rozpoznavanim fotiek." };
+    return { ok: false, messageSk: "Nepodarilo sa spojit s rozpoznavanim fotiek." };
   }
 
   if (!response.ok) {
     return {
       ok: false,
-      messageSk: `Gemini vision model nie je teraz dostupny (${response.status}). Skus znova o chvilu alebo pouzi 4 jasne fotky.`
+      messageSk: `Hlavne rozpoznavanie vratilo HTTP ${response.status}. Skus znova o chvilu alebo pouzi 4 jasne fotky.`
     };
   }
 
@@ -248,7 +248,7 @@ export async function analyzePyraminxImages(images: Record<PyraminxFaceId, strin
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!openRouterKey && !geminiKey) {
-    return { ok: false, messageSk: "AI rozpoznavanie fotiek zatial nie je nakonfigurovane (chyba API kluc)." };
+    return { ok: false, messageSk: "Rozpoznavanie fotiek nie je nakonfigurovane. Vo Verceli chyba kluc pre rozpoznavanie." };
   }
 
   const errors: string[] = [];
@@ -267,7 +267,7 @@ export async function analyzePyraminxImages(images: Record<PyraminxFaceId, strin
 
   return {
     ok: false,
-    messageSk: errors[0] ?? "AI rozpoznanie zlyhalo. Skus 4 jasne fotky pri dobrom svetle."
+    messageSk: errors.join(" | ") || "Rozpoznanie zlyhalo. Skus 4 jasne fotky pri dobrom svetle."
   };
 }
 
@@ -275,7 +275,7 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!openRouterKey && !geminiKey) {
-    return { ok: false, messageSk: "AI rozpoznavanie fotiek zatial nie je nakonfigurovane (chyba API kluc)." };
+    return { ok: false, messageSk: "Rozpoznavanie fotiek nie je nakonfigurovane. Vo Verceli chyba kluc pre rozpoznavanie." };
   }
 
   const parsed = parseDataUrl(dataUrl);
@@ -283,7 +283,7 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
     return { ok: false, messageSk: "Fotka ma neplatny format." };
   }
 
-  let result: AnalyzeFaceResult = { ok: false, messageSk: "AI rozpoznavanie fotiek zatial nie je nakonfigurovane (chyba API kluc)." };
+  let result: AnalyzeFaceResult = { ok: false, messageSk: "Rozpoznavanie fotiek nie je nakonfigurovane. Vo Verceli chyba kluc pre rozpoznavanie." };
   const errors: string[] = [];
 
   if (geminiKey) {
@@ -300,6 +300,6 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
 
   return {
     ok: false,
-    messageSk: errors[0] ?? result.messageSk ?? "AI rozpoznanie zlyhalo. Skus 4 jasne fotky pri dobrom svetle."
+    messageSk: errors.join(" | ") || result.messageSk || "Rozpoznanie zlyhalo. Skus 4 jasne fotky pri dobrom svetle."
   };
 }
