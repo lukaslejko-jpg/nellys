@@ -34,14 +34,6 @@ const STICKER_SAMPLE_POINTS = [
 ] as const;
 
 const FACE_ASSIGNMENTS = buildFaceAssignments();
-const FACE_ORIENTATION_TRANSFORMS = [
-  [0, 1, 2, 3, 4, 5, 6, 7, 8],
-  [4, 3, 5, 6, 8, 7, 1, 2, 0],
-  [8, 6, 7, 1, 0, 2, 3, 5, 4],
-  [0, 1, 2, 6, 8, 7, 3, 5, 4],
-  [4, 6, 7, 3, 0, 5, 1, 2, 8],
-  [8, 3, 5, 6, 4, 7, 1, 2, 0]
-] as const;
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
@@ -142,49 +134,17 @@ function buildFaceAssignments(): FaceId[][] {
 }
 
 function decodeStateFromAnyFaceAssignment(sampledFaces: StickerColorId[][]): PyraminxState | null {
-  const orientedFaceOptions = sampledFaces.map((colors) => buildFaceOrientationOptions(colors));
   for (const assignment of FACE_ASSIGNMENTS) {
-    const state = decodeStateFromOrientedFaces(assignment, orientedFaceOptions);
+    const faceColors = {} as Record<FaceId, StickerColorId[]>;
+    for (let index = 0; index < assignment.length; index += 1) {
+      faceColors[assignment[index]] = sampledFaces[index];
+    }
+
+    const state = decodeStateFromFaceColors(faceColors);
     if (state) return state;
   }
 
   return null;
-}
-
-function buildFaceOrientationOptions(colors: StickerColorId[]): StickerColorId[][] {
-  const seen = new Set<string>();
-  const variants: StickerColorId[][] = [];
-
-  for (const transform of FACE_ORIENTATION_TRANSFORMS) {
-    const variant = transform.map((sourceIndex) => colors[sourceIndex]);
-    const key = variant.join(",");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    variants.push(variant);
-  }
-
-  return variants;
-}
-
-function decodeStateFromOrientedFaces(assignment: FaceId[], options: StickerColorId[][][]): PyraminxState | null {
-  const faceColors = {} as Record<FaceId, StickerColorId[]>;
-
-  function tryFace(index: number): PyraminxState | null {
-    if (index === assignment.length) {
-      return decodeStateFromFaceColors(faceColors);
-    }
-
-    const face = assignment[index];
-    for (const colors of options[index]) {
-      faceColors[face] = colors;
-      const state = tryFace(index + 1);
-      if (state) return state;
-    }
-
-    return null;
-  }
-
-  return tryFace(0);
 }
 
 async function sampleFaceColors(url: string): Promise<StickerColorId[] | null> {
@@ -312,7 +272,7 @@ function classifyStickerColor(r: number, g: number, b: number): StickerColorId |
   return null;
 }
 
-function colorStrength(r: number, g: number, b: number {
+function colorStrength(r: number, g: number, b: number): number {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   return Math.max(0, (max - min) / 30);
@@ -321,39 +281,8 @@ function colorStrength(r: number, g: number, b: number {
 function scoreRecognizableFrame(ctx: CanvasRenderingContext2D, size: number): number {
   const bounds = detectColoredBounds(ctx, size);
   if (!bounds) return 0;
-
-  const data = ctx.getImageData(0, 0, size, size).data;
-  const counts = {
-    red: 0,
-    green: 0,
-    blue: 0,
-    yellow: 0
-  } satisfies Record<StickerColorId, number>;
-  const step = Math.max(2, Math.round(size / 120));
-
-  for (let y = 0; y < size; y += step) {
-    for (let x = 0; x < size; x += step) {
-      const index = (y * size + x) * 4;
-      const color = classifyStickerColor(data[index], data[index + 1], data[index + 2]);
-      if (color) counts[color] += 1;
-    }
-  }
-
   const relativeSize = bounds.size / size;
-  const centerX = (bounds.left + bounds.size / 2) / size;
-  const centerY = (bounds.top + bounds.size / 2) / size;
-  const centerPenalty = Math.abs(centerX - 0.5) + Math.abs(centerY - 0.54);
-  const borderPenalty =
-    bounds.left < size * 0.04 ||
-    bounds.top < size * 0.04 ||
-    bounds.left + bounds.size > size * 0.96 ||
-    bounds.top + bounds.size > size * 0.96
-      ? 0.35
-      : 0;
-  const colorDiversity = Object.values(counts).filter((count) => count > 8).length;
-  const diversityBonus = Math.min(colorDiversity, 4) * 0.08;
-
-  return relativeSize + diversityBonus - centerPenalty - borderPenalty;
+  return relativeSize;
 }
 
 async function computeSolution(state: PyraminxState, signal?: AbortSignal): Promise<{ moves: string[] | null; status: string }> {
@@ -392,14 +321,14 @@ function toUserRescanMessage(text?: string): string {
   }
 
   if (/decode|platny|Farby/i.test(text)) {
-    return "Farby zo snimok este nedavaju overeny Pyraminx stav. Zacni skenovat znova: ukaz 4 rozne cele strany, vzdy spickou hore, bez prstov cez nalepky.";
+    return "Farby zo snimok nedavaju platny Pyraminx stav. Skus znova a ukaz kazdu zo 4 stran samostatne, rovno a zblizka.";
   }
 
   return text;
 }
 
 async function fileToObjectUrl(file: File): Promise<string> {
-  return URL.createObjectURL(file);
+  return URL.createObjectUrL(file);
 }
 
 function waitForVideoEvent(video: HTMLVideoElement, eventName: keyof HTMLMediaElementEventMap): Promise<void> {
@@ -433,7 +362,7 @@ async function extractVideoFrames(file: File): Promise<CapturedFace[]> {
     await waitForVideoEvent(video, "loadedmetadata");
     const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 4;
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("canvas_error");
 
     const captures: CapturedFace[] = [];
@@ -443,8 +372,8 @@ async function extractVideoFrames(file: File): Promise<CapturedFace[]> {
       const segmentStart = duration * (index / pyraminxFaceIds.length);
       const segmentEnd = duration * ((index + 1) / pyraminxFaceIds.length);
 
-      for (let attempt = 1; attempt <= 9; attempt += 1) {
-        video.currentTime = segmentStart + (segmentEnd - segmentStart) * (attempt / 10);
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        video.currentTime = segmentStart + (segmentEnd - segmentStart) * (attempt / 6);
         await waitForVideoEvent(video, "seeked");
 
         const size = Math.min(video.videoWidth, video.videoHeight) || 720;
