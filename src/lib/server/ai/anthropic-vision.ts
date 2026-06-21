@@ -247,14 +247,14 @@ export async function analyzePyraminxImages(images: Record<PyraminxFaceId, strin
 
   const errors: string[] = [];
 
-  if (openRouterKey) {
-    const result = await analyzeFacesWithOpenRouter(openRouterKey, images);
+  if (geminiKey) {
+    const result = await analyzeFacesWithGemini(geminiKey, images);
     if (result.ok) return result;
     errors.push(result.messageSk);
   }
 
-  if (geminiKey) {
-    const result = await analyzeFacesWithGemini(geminiKey, images);
+  if (openRouterKey) {
+    const result = await analyzeFacesWithOpenRouter(openRouterKey, images);
     if (result.ok) return result;
     errors.push(result.messageSk);
   }
@@ -280,14 +280,14 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
   let result: AnalyzeFaceResult = { ok: false, messageSk: "AI rozpoznavanie fotiek zatial nie je nakonfigurovane (chyba API kluc)." };
   const errors: string[] = [];
 
-  if (openRouterKey) {
-    result = await analyzeWithOpenRouter(openRouterKey, dataUrl);
+  if (geminiKey) {
+    result = await analyzeWithGemini(geminiKey, parsed.mediaType, parsed.base64Data);
     if (result.ok) return result;
     errors.push(result.messageSk);
   }
 
-  if (geminiKey) {
-    result = await analyzeWithGemini(geminiKey, parsed.mediaType, parsed.base64Data);
+  if (openRouterKey) {
+    result = await analyzeWithOpenRouter(openRouterKey, dataUrl);
     if (result.ok) return result;
     errors.push(result.messageSk);
   }
