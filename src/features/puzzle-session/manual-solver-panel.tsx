@@ -3,8 +3,7 @@
 import { useRef, useState } from "react";
 import type { PyraminxMove } from "@/lib/domain/pyraminx/moves";
 import type { PyraminxState } from "@/lib/domain/pyraminx/state";
-import { pyraminxFaceIds, type PyraminxFaceId, type StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
-import { decodeStateFromFaceColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
+import { pyraminxFaceIds, type PyraminxFaceId } from "@/lib/domain/pyraminx/media-inspection";
 import { CameraCapture, type CapturedFace } from "@/features/puzzle-session/camera-capture";
 import { SolveGuide } from "@/features/puzzle-session/solve-guide";
 
@@ -18,22 +17,8 @@ type VisionResult =
 
 type SolveStatus = "idle" | "capturing" | "analyzing" | "solving" | "ready" | "needs_rescan" | "error";
 
-const ANALYSIS_TIMEOUT_MS = 8000;
+const ANALYSIS_TIMEOUT_MS = 25000;
 const SOLVER_TIMEOUT_MS = 15000;
-
-const STICKER_SAMPLE_POINTS = [
-  [0.5, 0.18],
-  [0.36, 0.38],
-  [0.5, 0.38],
-  [0.64, 0.38],
-  [0.22, 0.68],
-  [0.36, 0.68],
-  [0.5, 0.68],
-  [0.64, 0.68],
-  [0.78, 0.68]
-] as const;
-
-const FACE_ASSIGNMENTS = buildFaceAssignments();
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
@@ -46,6 +31,34 @@ async function blobUrlToDataUrl(url: string): Promise<string> {
   });
 }
 
+async function fileToObjectUrl(file: File): Promise<string> {
+  return URL.createObjectURL(file);
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function postJson<T>(url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: body !== undefined ? { "content-type": "application/json" } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal
+  });
+  return response.json() as Promise<T>;
+}
+
+async function putJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal
+  });
+  return response.json() as Promise<T>;
+}
+
 async function recognizeStateFromPhotos(captures: CapturedFace[], signal?: AbortSignal): Promise<VisionResult> {
   const images: Partial<Record<PyraminxFaceId, string>> = {};
   for (const capture of captures) {
@@ -54,245 +67,12 @@ async function recognizeStateFromPhotos(captures: CapturedFace[], signal?: Abort
   return postJson<VisionResult>("/api/pyraminx-vision", { images }, signal);
 }
 
-async function recognizeStateLocally(captures: CapturedFace[]): Promise<VisionResult> {
-  const sampledFaces: StickerColorId[][] = [];
-
-  for (const capture of captures) {
-    const colors = await sampleFaceColors(capture.url);
-    if (!colors) {
-      return { ok: false, messageSk: "Fotky su rozmazane alebo je na nich malo farieb." };
-    }
-    sampledFaces.push(colors);
-  }
-
-  const state = decodeStateFromAnyFaceAssignment(sampledFaces);
-  if (!state) {
-    return { ok: false, messageSk: "Lokalne citanie farieb nenaslo platny Pyraminx stav ani po prehodeni stran." };
-  }
-
-  return { ok: true, state };
-}
-
-async function normalizeCaptures(captures: CapturedFace[]): Promise<CapturedFace[]> {
-  return Promise.all(
-    captures.map(async (capture) => ({
-      ...capture,
-      url: await normalizeCaptureUrl(capture.url)
-    }))
-  );
-}
-
-async function normalizeCaptureUrl(url: string): Promise<string> {
-  const image = await loadImage(url);
-  const size = Math.min(image.naturalWidth, image.naturalHeight);
-  if (!size) return url;
-
-  const source = document.createElement("canvas");
-  source.width = size;
-  source.height = size;
-  const sourceCtx = source.getContext("2d", { willReadFrequently: true });
-  if (!sourceCtx) return url;
-
-  const sx = Math.max(0, (image.naturalWidth - size) / 2);
-  const sy = Math.max(0, (image.naturalHeight - size) / 2);
-  sourceCtx.drawImage(image, sx, sy, size, size, 0, 0, size, size);
-
-  const bounds = detectColoredBounds(sourceCtx, size);
-  if (!bounds) return url;
-
-  const outputSize = 720;
-  const output = document.createElement("canvas");
-  output.width = outputSize;
-  output.height = outputSize;
-  const outputCtx = output.getContext("2d");
-  if (!outputCtx) return url;
-
-  outputCtx.fillStyle = "#ffffff";
-  outputCtx.fillRect(0, 0, outputSize, outputSize);
-  outputCtx.drawImage(source, bounds.left, bounds.top, bounds.size, bounds.size, 0, 0, outputSize, outputSize);
-
-  const blob = await new Promise<Blob | null>((resolve) => output.toBlob(resolve, "image/jpeg", 0.94));
-  return blob ? URL.createObjectURL(blob) : url;
-}
-
-function buildFaceAssignments(): FaceId[][] {
-  const faces = [...pyraminxFaceIds] as FaceId[];
-  const result: FaceId[][] = [];
-
-  function permute(prefix: FaceId[], remaining: FaceId[]) {
-    if (remaining.length === 0) {
-      result.push(prefix);
-      return;
-    }
-    for (let index = 0; index < remaining.length; index += 1) {
-      permute([...prefix, remaining[index]], [...remaining.slice(0, index), ...remaining.slice(index + 1)]);
-    }
-  }
-
-  permute([], faces);
-  return result;
-}
-
-function decodeStateFromAnyFaceAssignment(sampledFaces: StickerColorId[][]): PyraminxState | null {
-  for (const assignment of FACE_ASSIGNMENTS) {
-    const faceColors = {} as Record<FaceId, StickerColorId[]>;
-    for (let index = 0; index < assignment.length; index += 1) {
-      faceColors[assignment[index]] = sampledFaces[index];
-    }
-
-    const state = decodeStateFromFaceColors(faceColors);
-    if (state) return state;
-  }
-
-  return null;
-}
-
-async function sampleFaceColors(url: string): Promise<StickerColorId[] | null> {
-  const image = await loadImage(url);
-  const size = Math.min(image.naturalWidth, image.naturalHeight);
-  if (!size) return null;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return null;
-
-  const sx = Math.max(0, (image.naturalWidth - size) / 2);
-  const sy = Math.max(0, (image.naturalHeight - size) / 2);
-  ctx.drawImage(image, sx, sy, size, size, 0, 0, size, size);
-
-  const bounds = detectColoredBounds(ctx, size);
-  if (!bounds) return null;
-
-  const radius = Math.max(8, Math.round(bounds.size * 0.055));
-  const colors: StickerColorId[] = [];
-  for (const [px, py] of STICKER_SAMPLE_POINTS) {
-    const color = sampleStickerColor(
-      ctx,
-      Math.round(bounds.left + px * bounds.size),
-      Math.round(bounds.top + py * bounds.size),
-      radius,
-      size
-    );
-    if (!color) return null;
-    colors.push(color);
-  }
-  return colors;
-}
-
-function detectColoredBounds(ctx: CanvasRenderingContext2D, size: number): { left: number; top: number; size: number } | null {
-  const data = ctx.getImageData(0, 0, size, size).data;
-  let minX = size;
-  let minY = size;
-  let maxX = 0;
-  let maxY = 0;
-  let count = 0;
-  const step = Math.max(2, Math.round(size / 180));
-
-  for (let y = 0; y < size; y += step) {
-    for (let x = 0; x < size; x += step) {
-      const index = (y * size + x) * 4;
-      if (!classifyStickerColor(data[index], data[index + 1], data[index + 2])) continue;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-      count += 1;
-    }
-  }
-
-  if (count < 24 || maxX <= minX || maxY <= minY) return null;
-
-  const width = maxX - minX;
-  const height = maxY - minY;
-  const boxSize = Math.max(width, height);
-  const padding = Math.round(boxSize * 0.14);
-  const finalSize = Math.min(size, boxSize + padding * 2);
-  const centerX = (minX + maxX) / 2;
-  const centerY = (minY + maxY) / 2;
-
-  return {
-    left: Math.max(0, Math.min(size - finalSize, Math.round(centerX - finalSize / 2))),
-    top: Math.max(0, Math.min(size - finalSize, Math.round(centerY - finalSize / 2))),
-    size: finalSize
-  };
-}
-
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = url;
-  });
-}
-
-function sampleStickerColor(
-  ctx: CanvasRenderingContext2D,
-  centerX: number,
-  centerY: number,
-  radius: number,
-  size: number
-): StickerColorId | null {
-  const totals = {
-    red: 0,
-    green: 0,
-    blue: 0,
-    yellow: 0
-  } satisfies Record<StickerColorId, number>;
-  const left = Math.max(0, centerX - radius);
-  const top = Math.max(0, centerY - radius);
-  const width = Math.min(size - left, radius * 2);
-  const height = Math.min(size - top, radius * 2);
-  const data = ctx.getImageData(left, top, width, height).data;
-
-  for (let index = 0; index < data.length; index += 4) {
-    const r = data[index];
-    const g = data[index + 1];
-    const b = data[index + 2];
-    const color = classifyStickerColor(r, g, b);
-    if (color) totals[color] += colorStrength(r, g, b);
-  }
-
-  const entries = Object.entries(totals) as [StickerColorId, number][];
-  const [bestColor, bestScore] = entries.sort((a, b) => b[1] - a[1])[0];
-  return bestScore > 8 ? bestColor : null;
-}
-
-function classifyStickerColor(r: number, g: number, b: number): StickerColorId | null {
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  if (max < 65 || max - min < 24) return null;
-
-  if (r > 135 && g > 110 && b < 110) return "yellow";
-  if (g > r * 1.08 && g > b * 1.08) return "green";
-  if (b > r * 1.06 && b > g * 1.04) return "blue";
-  if (r > g * 1.08 && r > b * 1.08) return "red";
-  return null;
-}
-
-function colorStrength(r: number, g: number, b: number): number {
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  return Math.max(0, (max - min) / 30);
-}
-
-function scoreRecognizableFrame(ctx: CanvasRenderingContext2D, size: number): number {
-  const bounds = detectColoredBounds(ctx, size);
-  if (!bounds) return 0;
-  const relativeSize = bounds.size / size;
-  return relativeSize;
-}
-
 async function computeSolution(state: PyraminxState, signal?: AbortSignal): Promise<{ moves: string[] | null; status: string }> {
   try {
     const created = await postJson<ApiResult>("/api/puzzle-sessions", undefined, signal);
     if (!created.ok) return { moves: null, status: created.messageSk ?? "Nepodarilo sa vytvorit riesenie." };
 
-    const saved = await putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, {
-      correctedState: state
-    }, signal);
+    const saved = await putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, { correctedState: state }, signal);
     if (!saved.ok) return { moves: null, status: saved.messageSk ?? "Nepodarilo sa ulozit rozpoznany stav." };
 
     const solved = await postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`, undefined, signal);
@@ -300,35 +80,9 @@ async function computeSolution(state: PyraminxState, signal?: AbortSignal): Prom
 
     return { moves: solved.session.solution ?? [], status: "" };
   } catch (error) {
-    if (isAbortError(error)) {
-      return { moves: null, status: "Vypocet trval prilis dlho. Skus snimky este raz alebo nahraj kratsie video." };
-    }
-    return { moves: null, status: "Poziadavka zlyhala. Skontroluj prihlasenie, internet a databazu." };
+    if (isAbortError(error)) return { moves: null, status: "Solver odpovedal prilis pomaly. Skus znova." };
+    return { moves: null, status: "Poziadavka zlyhala. Skontroluj internet a prihlasenie." };
   }
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
-
-function toUserRescanMessage(text?: string): string {
-  if (!text) {
-    return "AI z tychto snimok neprecitala farby spolahlivo. Skus znova: viac svetla, ihlan blizsie a jedna cela strana v trojuholniku.";
-  }
-
-  if (/OpenRouter|Gemini|model|quota|API|404|429/i.test(text)) {
-    return "AI rozpoznanie teraz nevratilo pouzitelne farby. Solver preto este nemoze vypocitat tahy. Skus znova s ostrejsim zaberom alebo nahraj kratke video.";
-  }
-
-  if (/decode|platny|Farby/i.test(text)) {
-    return "Farby zo snimok nedavaju platny Pyraminx stav. Skus znova a ukaz kazdu zo 4 stran samostatne, rovno a zblizka.";
-  }
-
-  return text;
-}
-
-async function fileToObjectUrl(file: File): Promise<string> {
-  return URL.createObjectUrL(file);
 }
 
 function waitForVideoEvent(video: HTMLVideoElement, eventName: keyof HTMLMediaElementEventMap): Promise<void> {
@@ -367,37 +121,33 @@ async function extractVideoFrames(file: File): Promise<CapturedFace[]> {
 
     const captures: CapturedFace[] = [];
     for (let index = 0; index < pyraminxFaceIds.length; index += 1) {
-      let bestBlob: Blob | null = null;
-      let bestScore = 0;
-      const segmentStart = duration * (index / pyraminxFaceIds.length);
-      const segmentEnd = duration * ((index + 1) / pyraminxFaceIds.length);
+      const time = duration * ((index + 0.5) / pyraminxFaceIds.length);
+      video.currentTime = Math.min(duration - 0.05, Math.max(0, time));
+      await waitForVideoEvent(video, "seeked");
 
-      for (let attempt = 1; attempt <= 5; attempt += 1) {
-        video.currentTime = segmentStart + (segmentEnd - segmentStart) * (attempt / 6);
-        await waitForVideoEvent(video, "seeked");
+      const size = Math.min(video.videoWidth, video.videoHeight) || 720;
+      canvas.width = size;
+      canvas.height = size;
+      const sx = Math.max(0, (video.videoWidth - size) / 2);
+      const sy = Math.max(0, (video.videoHeight - size) / 2);
+      ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
 
-        const size = Math.min(video.videoWidth, video.videoHeight) || 720;
-        canvas.width = size;
-        canvas.height = size;
-        const sx = Math.max(0, (video.videoWidth - size) / 2);
-        const sy = Math.max(0, (video.videoHeight - size) / 2);
-        ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
-
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
-        if (!blob) continue;
-        const score = scoreRecognizableFrame(ctx, size);
-        if (score < bestScore && bestBlob) continue;
-        bestScore = score;
-        bestBlob = blob;
-      }
-
-      if (!bestBlob) throw new Error("frame_error");
-      captures.push({ face: pyraminxFaceIds[index], url: URL.createObjectURL(bestBlob) });
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+      if (!blob) throw new Error("frame_error");
+      captures.push({ face: pyraminxFaceIds[index], url: URL.createObjectURL(blob) });
     }
     return captures;
   } finally {
     URL.revokeObjectURL(videoUrl);
   }
+}
+
+function toUserRescanMessage(text?: string): string {
+  if (!text) return "AI z tychto snimok este nevie urobit platny stav. Skus 4 jasne cele strany zblizka.";
+  if (/quota|429/i.test(text)) return "Gemini limit je docasne vycerpany. Skus znovu neskor alebo nastav iny Gemini API kluc.";
+  if (/API|model|Gemini|OpenRouter|404/i.test(text)) return "AI rozpoznanie teraz neodpovedalo pouzitelne. Skus znova alebo nahraj kratsie video.";
+  if (/platny|Farby|decode/i.test(text)) return "Farby nedavaju platny Pyraminx stav. Ukaz kazdu zo 4 stran samostatne, rovno, zblizka a bez prstov cez nalepky.";
+  return text;
 }
 
 export function PhotoUploadPanel() {
@@ -406,7 +156,7 @@ export function PhotoUploadPanel() {
   const [captures, setCaptures] = useState<CapturedFace[]>([]);
   const [moves, setMoves] = useState<string[] | null>(null);
   const [scrambleState, setScrambleState] = useState<PyraminxState | null>(null);
-  const [message, setMessage] = useState("Ukaz mi 4 cele strany ihlana. Potom automaticky precitam stav a pustim solver.");
+  const [message, setMessage] = useState("Ukaz mi 4 cele strany ihlana. Potom pouzijem AI a deterministicky solver.");
   const [status, setStatus] = useState<SolveStatus>("idle");
   const [soundEnabled, setSoundEnabled] = useState(false);
   const activeJobRef = useRef(0);
@@ -427,12 +177,7 @@ export function PhotoUploadPanel() {
     setMoves(null);
     setScrambleState(null);
     setStatus("idle");
-    setMessage("Ukaz mi 4 cele strany ihlana. Potom automaticky precitam stav a pustim solver.");
-  }
-
-  function retryCapture() {
-    clearCaptures();
-    setMessage("Ukaz prvu celu stranu. Nellys bude fotit automaticky, ked bude ihlan sediet v trojuholniku.");
+    setMessage("Ukaz mi 4 cele strany ihlana. Potom pouzijem AI a deterministicky solver.");
   }
 
   function askForRescan(text?: string) {
@@ -448,57 +193,46 @@ export function PhotoUploadPanel() {
     const jobId = activeJobRef.current + 1;
     activeJobRef.current = jobId;
     captures.forEach((capture) => URL.revokeObjectURL(capture.url));
-    const preparedCaptures = await normalizeCaptures(nextCaptures);
-    setCaptures(preparedCaptures);
+    setCaptures(nextCaptures);
     setMoves(null);
     setScrambleState(null);
     setStatus("analyzing");
-    setMessage("Mam obrazky. Najprv opravim snimky, potom citam farby. Ak to neprejde, skusim AI.");
-    speakText("Mam obrazky. Citam farby.");
+    setMessage("Mam 4 snimky. Gemini cita farby. Cakam najviac 25 sekund.");
+    speakText("Mam snimky. Citam farby.");
 
-    let recognized = await recognizeStateLocally(preparedCaptures);
-    const localMessage = recognized.ok ? "" : recognized.messageSk;
-    if (!recognized.ok) {
-      setMessage("Lokalne citanie nestacilo. Skusam AI rozpoznanie, najviac 8 sekund.");
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
-      try {
-        recognized = await recognizeStateFromPhotos(preparedCaptures, controller.signal);
-      } catch (error) {
-        if (activeJobRef.current !== jobId) return;
-        const aborted = isAbortError(error);
-        askForRescan(
-          aborted
-            ? `${localMessage ?? "Lokalne citanie este nenaslo platny stav."} AI nestihla do 8 sekund. Stlac Skenovat znova a ukaz kazdu stranu vacsiu v trojuholniku.`
-            : `${localMessage ?? "Lokalne citanie este nenaslo platny stav."} AI tiez neprecitala stav. Stlac Skenovat znova a ukaz kazdu stranu vacsiu v trojuholniku.`
-        );
-        return;
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
+    let recognized: VisionResult;
+    try {
+      recognized = await recognizeStateFromPhotos(nextCaptures, controller.signal);
+    } catch (error) {
+      if (activeJobRef.current !== jobId) return;
+      askForRescan(isAbortError(error) ? "Gemini nestihla precitat stav do 25 sekund. Skus video alebo 4 ostre fotky zblizka." : undefined);
+      return;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
 
     if (activeJobRef.current !== jobId) return;
-
     if (!recognized.ok) {
-      askForRescan(recognized.messageSk ?? "AI neprecitala platny stav. Ukaz ihlan znova pomalsie a zblizka.");
+      askForRescan(recognized.messageSk);
       return;
     }
 
     setStatus("solving");
-    setMessage("Stav sedi. Teraz solver pocita a overuje tahy.");
-    speakText("Stav sedi. Teraz pocitam riesenie.");
+    setMessage("Stav je precitany. Solver teraz pocita a overuje tahy.");
+    speakText("Stav sedi. Pocitam riesenie.");
+
     const solveController = new AbortController();
     const solveTimeoutId = window.setTimeout(() => solveController.abort(), SOLVER_TIMEOUT_MS);
     const solved = await computeSolution(recognized.state, solveController.signal);
     window.clearTimeout(solveTimeoutId);
 
     if (activeJobRef.current !== jobId) return;
-
     if (!solved.moves) {
       setStatus("error");
       setMessage(solved.status);
-      speakText("Solver tento stav nevie spracovat. Skus snimanie este raz.");
+      speakText("Solver tento stav nevie spracovat.");
       return;
     }
 
@@ -506,11 +240,7 @@ export function PhotoUploadPanel() {
     setScrambleState(recognized.state);
     setStatus("ready");
     setMessage(solved.moves.length === 0 ? "Hotovo. Tento Pyraminx je uz vyrieseny." : "Riesenie je pripravene. Rob kroky jeden po druhom.");
-    speakText(solved.moves.length === 0 ? "Hotovo. Tento Pyraminx je uz vyrieseny." : "Riesenie je pripravene. Rob kroky jeden po druhom.");
-  }
-
-  async function handleCameraComplete(nextCaptures: CapturedFace[]) {
-    await solveFromCaptures(nextCaptures);
+    speakText(solved.moves.length === 0 ? "Hotovo." : "Riesenie je pripravene.");
   }
 
   async function handleImageFiles(files: FileList | null) {
@@ -518,12 +248,11 @@ export function PhotoUploadPanel() {
     if (imageInputRef.current) imageInputRef.current.value = "";
     const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/")).slice(0, pyraminxFaceIds.length);
     if (imageFiles.length < pyraminxFaceIds.length) {
-      askForRescan("Potrebujem presne 4 ostre fotky: jednu pre kazdu stranu ihlana.");
+      askForRescan("Potrebujem presne 4 fotky: jednu pre kazdu stranu ihlana.");
       return;
     }
-
     setStatus("capturing");
-    setMessage("Fotky mam. Pouzijem ich v poradi: prva, lava, prava a posledna strana.");
+    setMessage("Fotky mam. Hned ich posielam do AI.");
     const nextCaptures = await Promise.all(
       imageFiles.map(async (file, index) => ({ face: pyraminxFaceIds[index], url: await fileToObjectUrl(file) }))
     );
@@ -535,27 +264,23 @@ export function PhotoUploadPanel() {
     if (!file) return;
     if (videoInputRef.current) videoInputRef.current.value = "";
     if (!file.type.startsWith("video/")) {
-      askForRescan("Vybrany subor nie je video. Nahraj kratke video alebo 4 fotky.");
+      askForRescan("Vybrany subor nie je video.");
       return;
     }
-
     setStatus("capturing");
-    setMessage("Video mam. Vyberam z neho 4 snimky. Hned potom spustim AI a solver.");
-    speakText("Video mam. Vyberam z neho styri snimky.");
+    setMessage("Video mam. Vyberam 4 snimky a potom spustim AI.");
+    speakText("Video mam. Vyberam styri snimky.");
     try {
-      const nextCaptures = await extractVideoFrames(file);
-      await solveFromCaptures(nextCaptures);
+      await solveFromCaptures(await extractVideoFrames(file));
     } catch {
-      askForRescan("Z videa neviem vybrat pouzitelne snimky. Natoc ihlan pomalsie alebo nahraj 4 fotky.");
+      askForRescan("Z videa neviem vybrat 4 snimky. Nahraj kratsie video alebo 4 fotky.");
     }
   }
 
   function toggleSound() {
     const next = !soundEnabled;
     setSoundEnabled(next);
-    if (!next && typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
+    if (!next && typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
   }
 
   return (
@@ -577,21 +302,8 @@ export function PhotoUploadPanel() {
             {soundEnabled ? "Zvuk vypnut" : "Zvuk zapnut"}
           </button>
         </div>
-        <input
-          ref={imageInputRef}
-          accept="image/*"
-          multiple
-          onChange={(event) => void handleImageFiles(event.target.files)}
-          style={{ display: "none" }}
-          type="file"
-        />
-        <input
-          ref={videoInputRef}
-          accept="video/*"
-          onChange={(event) => void handleVideoFile(event.target.files)}
-          style={{ display: "none" }}
-          type="file"
-        />
+        <input ref={imageInputRef} accept="image/*" multiple onChange={(event) => void handleImageFiles(event.target.files)} style={{ display: "none" }} type="file" />
+        <input ref={videoInputRef} accept="video/*" onChange={(event) => void handleVideoFile(event.target.files)} style={{ display: "none" }} type="file" />
       </section>
 
       {status === "ready" && moves && scrambleState ? (
@@ -604,36 +316,28 @@ export function PhotoUploadPanel() {
             <span />
           </div>
         </section>
+      ) : status === "needs_rescan" || status === "error" ? (
+        <section className="rescan-guide action-rescan" aria-live="polite">
+          <strong>Este nemam stav pre solver</strong>
+          <p>{message}</p>
+          <div className="solver-actions">
+            <button className="button" onClick={clearCaptures} type="button">
+              Skenovat znova
+            </button>
+            <button className="button secondary" onClick={() => videoInputRef.current?.click()} type="button">
+              Nahrat video
+            </button>
+          </div>
+        </section>
       ) : (
-        status === "needs_rescan" || status === "error" ? (
-          <section className="rescan-guide action-rescan" aria-live="polite">
-            <strong>Este nemam stav pre solver</strong>
-            <p>{message}</p>
-            <ol>
-              <li>Daj do zlteho trojuholnika jednu celu stranu.</li>
-              <li>Drz telefon aj ihlan 2 sekundy bez pohybu.</li>
-              <li>Potom pomaly otoc na dalsiu stranu.</li>
-              <li>Po 4 stranach Nellys hned skusi AI a solver znova.</li>
-            </ol>
-            <div className="solver-actions">
-              <button className="button" onClick={retryCapture} type="button">
-                Skenovat znova
-              </button>
-              <button className="button secondary" onClick={() => videoInputRef.current?.click()} type="button">
-                Nahrat video
-              </button>
-            </div>
-          </section>
-        ) : (
-          <CameraCapture onComplete={handleCameraComplete} onSpeak={speakText} />
-        )
+        <CameraCapture onComplete={solveFromCaptures} onSpeak={speakText} />
       )}
 
       {captures.length > 0 ? (
         <section className="ai-guide">
           <div>
             <strong>Posledne snimky</strong>
-            <p>Ak niektora snimka neukazuje celu stranu, zacni znova a ukaz ihlan pomalsie.</p>
+            <p>Tieto 4 snimky posielam do AI v poradi U, L, R, B.</p>
           </div>
           <div className="camera-thumbs">
             {captures.map((capture) => (
@@ -649,29 +353,7 @@ export function PhotoUploadPanel() {
         </section>
       ) : null}
 
-      {status === "analyzing" || status === "solving" || status === "capturing" ? (
-        <p className="form-status">Pracujem. Nezatvaraj tuto stranku.</p>
-      ) : null}
+      {status === "analyzing" || status === "solving" || status === "capturing" ? <p className="form-status">Pracujem. Nezatvaraj tuto stranku.</p> : null}
     </div>
   );
-}
-
-async function postJson<T>(url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: body !== undefined ? { "content-type": "application/json" } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    signal
-  });
-  return response.json() as Promise<T>;
-}
-
-async function putJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(url, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal
-  });
-  return response.json() as Promise<T>;
 }
