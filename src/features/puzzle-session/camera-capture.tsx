@@ -105,8 +105,8 @@ function measurePyraminxInGuide(ctx: CanvasRenderingContext2D, size: number) {
   const centerY = colorPixels > 0 ? sumY / colorPixels / size : 0.5;
   const width = colorPixels > 0 ? (maxX - minX) / size : 0;
   const height = colorPixels > 0 ? (maxY - minY) / size : 0;
-  const centered = centerX > 0.24 && centerX < 0.76 && centerY > 0.18 && centerY < 0.86;
-  const largeEnough = coverage > 0.05 && width > 0.28 && height > 0.34;
+  const centered = centerX > 0.18 && centerX < 0.82 && centerY > 0.12 && centerY < 0.92;
+  const largeEnough = coverage > 0.028 && width > 0.16 && height > 0.2;
 
   return { centered, largeEnough, ready: centered && largeEnough };
 }
@@ -198,7 +198,7 @@ export function CameraCapture({
     ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
 
     const quality = measurePyraminxInGuide(ctx, size);
-    if (!quality.ready) {
+    if (!manual && !quality.ready) {
       stableProgressRef.current = 0;
       setGuidance({
         state: quality.largeEnough ? "center" : "search",
@@ -302,8 +302,8 @@ export function CameraCapture({
           const fullCoverage = fullFrameColorPixels / ((sampleSize / 2) * (sampleSize / 2));
           const quality = measurePyraminxInGuide(ctx, sampleSize);
           const centered = quality.centered;
-          const largeEnough = quality.largeEnough || fullCoverage > 0.12;
-          const ready = quality.ready && performance.now() - stepStartedAtRef.current > 1200;
+          const largeEnough = quality.largeEnough || fullCoverage > 0.08;
+          const ready = centered && largeEnough && performance.now() - stepStartedAtRef.current > 900;
 
           let next: VisualGuidance;
           if (!largeEnough) {
@@ -323,7 +323,7 @@ export function CameraCapture({
               progress: stableProgressRef.current
             };
           } else {
-            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.05);
+            stableProgressRef.current = Math.min(1, stableProgressRef.current + 0.08);
             next = {
               state: "hold",
               title: autoCaptureEnabled ? "Drz takto" : "Vyzera to dobre",
