@@ -39,7 +39,10 @@ export async function POST(request: Request) {
 
   const combined = await analyzePyraminxImages(completeImages);
   if (!combined.ok) {
-    return NextResponse.json({ ok: false, code: "analysis_failed", messageSk: combined.messageSk, requiresRescan: true }, { status: 200 });
+    return NextResponse.json(
+      { ok: false, code: "analysis_failed", messageSk: sanitizeVisionMessage(combined.messageSk), requiresRescan: true },
+      { status: 200 }
+    );
   }
 
   const state = decodeStateFromAnyOrientation(pyraminxFaceIds.map((face) => combined.faces[face]));
@@ -56,6 +59,14 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, state });
+}
+
+function sanitizeVisionMessage(message: string): string {
+  if (/API|model|Gemini|OpenRouter|404|429|quota/i.test(message)) {
+    return "Rozpoznavanie zlyhalo u poskytovatela. Skontroluj Vercel logs alebo kluc pre rozpoznavanie.";
+  }
+
+  return message;
 }
 
 function buildFaceAssignments(): FaceId[][] {
