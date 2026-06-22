@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { pyraminxFaceIds, type PyraminxFaceId, type StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
-import { decodeStateFromFaceColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
+import { decodeNearestStateFromFaceColors, decodeStateFromFaceColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
 import { analyzePyraminxImages } from "@/lib/server/ai/anthropic-vision";
 import { requireActorFromSessionCookie } from "@/lib/server/auth/require-actor";
 
@@ -9,6 +9,7 @@ type RequestBody = {
 };
 
 const FACE_ASSIGNMENTS = buildFaceAssignments();
+const MAX_AUTOMATIC_CORRECTIONS = 4;
 const FACE_ORIENTATION_TRANSFORMS = [
   [0, 1, 2, 3, 4, 5, 6, 7, 8],
   [4, 3, 5, 6, 8, 7, 1, 2, 0],
@@ -42,8 +43,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, code: "analysis_failed", messageSk: combined.messageSk, requiresRescan: true }, { status: 200 });
   }
 
-  const state = decodeStateFromAnyOrientation(pyraminxFaceIds.map((face) => combined.faces[face]));
-  if (!state) {
+  const decoded = decodeStateFromAnyOrientation(pyraminxFaceIds.map((face) => combined.faces[face]));
+  if (!decoded) {
     return NextResponse.json(
       {
         ok: false,
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true, state });
+  return NextResponse.json({ ok: true, state: decoded.state, corrections: decoded.corrections });
 }
 
 function buildFaceAssignments(): FaceId[][] {
@@ -79,14 +80,37 @@ function buildFaceAssignments(): FaceId[][] {
 
 function decodeStateFromAnyOrientation(sampledFaces: StickerColorId[][]) {
   const options = sampledFaces.map((colors) => buildFaceOrientationOptions(colors));
+  let nearest: ReturnType<typeof decodeNearestStateFromFaceColors> | null = null;
 
   for (const assignment of FACE_ASSIGNMENTS) {
     const faceColors = {} as Record<FaceId, StickerColorId[]>;
     const state = tryAssignment(assignment, options, faceColors, 0);
-    if (state) return state;
+    if (state) return { state, corrections: 0 };
+    const candidate = findNearestAssignment(assignment, options, faceColors, 0);
+    if (!nearest || candidate.mismatches < nearest.mismatches) nearest = candidate;
   }
 
-  return null;
+  return nearest && nearest.mismatches <= MAX_AUTOMATIC_CORRECTIONS
+    ? { state: nearest.state, corrections: nearest.mismatches }
+    : null;
+}
+
+function findNearestAssignment(
+  assignment: FaceId[],
+  options: StickerColorId[][][],
+  faceColors: Record<FaceId, StickerColorId[]>,
+  index: number
+): ReturnType<typeof decodeNearestStateFromFaceColors> {
+  if (index === assignment.length) return decodeNearestStateFromFaceColors(faceColors);
+
+  const face = assignment[index];
+  let best: ReturnType<typeof decodeNearestStateFromFaceColors> | null = null;
+  for (const colors of options[index]) {
+    faceColors[face] = colors;
+    const candidate = findNearestAssignment(assignment, options, faceColors, index + 1);
+    if (!best || candidate.mismatches < best.mismatches) best = candidate;
+  }
+  return best!;
 }
 
 function buildFaceOrientationOptions(colors: StickerColorId[]): StickerColorId[][] {
