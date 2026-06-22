@@ -4,6 +4,11 @@ import type { StickerColorId } from "./media-inspection";
 export type Vertex = "u" | "l" | "r" | "b";
 export type FaceId = "U" | "L" | "R" | "B";
 
+export type NearestStateResult = {
+  state: PyraminxState;
+  mismatches: number;
+};
+
 export const FACE_COLOR: Record<FaceId, StickerColorId> = {
   U: "blue",
   L: "green",
@@ -188,3 +193,107 @@ export function decodeStateFromFaceColors(faceColors: Record<FaceId, StickerColo
 
   return { tips, centers, edgesPerm, edgesOri };
 }
+
+/** Finds the physically valid state with the fewest sticker differences. */
+export function decodeNearestStateFromFaceColors(faceColors: Record<FaceId, StickerColorId[]>): NearestStateResult {
+  const tips = {} as PyraminxState["tips"];
+  const centers = {} as PyraminxState["centers"];
+  let mismatches = 0;
+
+  for (const vertex of ["u", "l", "r", "b"] as Vertex[]) {
+    const slotFaces = VERTEX_FACES[vertex];
+    const home = slotFaces.map((face) => FACE_COLOR[face]);
+    const tipDisplayed = slotFaces.map((face) => {
+      const cell = faceLayout(face).tips.find(([candidate]) => candidate === vertex)![1];
+      return faceColors[face][cell];
+    });
+    const centerDisplayed = slotFaces.map((face) => {
+      const cell = faceLayout(face).centers.find(([candidate]) => candidate === vertex)![1];
+      return faceColors[face][cell];
+    });
+
+    const tipChoice = closestOrientation(home, tipDisplayed);
+    const centerChoice = closestOrientation(home, centerDisplayed);
+    tips[vertex] = tipChoice.orientation;
+    centers[VERTEX_FACES[vertex][0]] = centerChoice.orientation;
+    mismatches += tipChoice.mismatches + centerChoice.mismatches;
+  }
+
+  const edgeCosts = Array.from({ length: 6 }, () => new Array<number>(6).fill(0));
+  const edgeOrientations = Array.from({ length: 6 }, () => new Array<0 | 1>(6).fill(0));
+
+  for (let position = 0; position < 6; position += 1) {
+    const edge = position as EdgeId;
+    const [faceA, faceB] = EDGE_FACES[edge];
+    const cellA = faceLayout(faceA).edges.find(([candidate]) => candidate === edge)![1];
+    const cellB = faceLayout(faceB).edges.find(([candidate]) => candidate === edge)![1];
+    const displayed = [faceColors[faceA][cellA], faceColors[faceB][cellB]];
+
+    for (let pieceIndex = 0; pieceIndex < 6; pieceIndex += 1) {
+      const piece = pieceIndex as EdgeId;
+      const home = [FACE_COLOR[EDGE_FACES[piece][0]], FACE_COLOR[EDGE_FACES[piece][1]]];
+      const normalCost = Number(displayed[0] !== home[0]) + Number(displayed[1] !== home[1]);
+      const flippedCost = Number(displayed[0] !== home[1]) + Number(displayed[1] !== home[0]);
+      edgeCosts[position][piece] = Math.min(normalCost, flippedCost);
+      edgeOrientations[position][piece] = flippedCost < normalCost ? 1 : 0;
+    }
+  }
+
+  const fullMask = (1 << 6) - 1;
+  const costs = new Array<number>(1 << 6).fill(Number.POSITIVE_INFINITY);
+  const previousMasks = new Array<number>(1 << 6).fill(-1);
+  const chosenPieces = new Array<number>(1 << 6).fill(-1);
+  costs[0] = 0;
+
+  for (let mask = 0; mask <= fullMask; mask += 1) {
+    const position = bitCount(mask);
+    if (position >= 6 || !Number.isFinite(costs[mask])) continue;
+    for (let piece = 0; piece < 6; piece += 1) {
+      if (mask & (1 << piece)) continue;
+      const nextMask = mask | (1 << piece);
+      const nextCost = costs[mask] + edgeCosts[position][piece];
+      if (nextCost >= costs[nextMask]) continue;
+      costs[nextMask] = nextCost;
+      previousMasks[nextMask] = mask;
+      chosenPieces[nextMask] = piece;
+    }
+  }
+
+  const edgesPerm = new Array<EdgeId>(6).fill(0) as PyraminxState["edgesPerm"];
+  const edgesOri = new Array<0 | 1>(6).fill(0) as PyraminxState["edgesOri"];
+  let mask = fullMask;
+  for (let position = 5; position >= 0; position -= 1) {
+    const piece = chosenPieces[mask] as EdgeId;
+    edgesPerm[position] = piece;
+    edgesOri[position] = edgeOrientations[position][piece];
+    mask = previousMasks[mask];
+  }
+
+  return {
+    state: { tips, centers, edgesPerm, edgesOri },
+    mismatches: mismatches + costs[fullMask]
+  };
+}
+
+function closestOrientation(home: StickerColorId[], displayed: StickerColorId[]) {
+  let bestOrientation: Orientation3 = 0;
+  let bestMismatches = Number.POSITIVE_INFINITY;
+  for (let orientation = 0; orientation < 3; orientation += 1) {
+    let current = 0;
+    for (let index = 0; index < 3; index += 1) {
+      current += Number(displayed[index] !== home[(index - orientation + 3) % 3]);
+    }
+    if (current < bestMismatches) {
+      bestMismatches = current;
+      bestOrientation = orientation as Orientation3;
+    }
+  }
+  return { orientation: bestOrientation, mismatches: bestMismatches };
+}
+
+function bitCount(value: number): number {
+  let count = 0;
+  for (let current = value; current > 0; current >>= 1) count += current & 1;
+  return count;
+}
+
