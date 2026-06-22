@@ -12,6 +12,7 @@ import { inverseMove, inverseSequence, legalMoves, parseMoveSequence } from "../
 import { solveState, verifySolution } from "../../src/lib/domain/pyraminx/solver.ts";
 import { applyMove, applySequence } from "../../src/lib/domain/pyraminx/simulator.ts";
 import { createSolvedState, isSolved, serializeState } from "../../src/lib/domain/pyraminx/state.ts";
+import { decodeNearestStateFromFaceColors, faceStickerColors, type FaceId } from "../../src/lib/domain/pyraminx/stickers.ts";
 import { validateStateShape } from "../../src/lib/domain/pyraminx/validator.ts";
 
 test("solved state validates and needs no moves", () => {
@@ -22,6 +23,19 @@ test("solved state validates and needs no moves", () => {
   assert.equal(validation.ok, true);
   assert.equal(solution.ok, true);
   assert.deepEqual(solution.ok ? solution.moves : ["failed"], []);
+});
+
+test("nearest sticker decoder corrects one recognition error deterministically", () => {
+  const solved = createSolvedState();
+  const faces = Object.fromEntries(
+    (["U", "L", "R", "B"] as FaceId[]).map((face) => [face, faceStickerColors(solved, face)])
+  ) as Record<FaceId, ReturnType<typeof faceStickerColors>>;
+  faces.U[0] = faces.U[0] === "red" ? "green" : "red";
+
+  const decoded = decodeNearestStateFromFaceColors(faces);
+
+  assert.equal(decoded.mismatches, 1);
+  assert.equal(serializeState(decoded.state), serializeState(solved));
 });
 
 test("every move followed by its inverse returns the original state", () => {
@@ -139,3 +153,4 @@ test("solver returns verified solutions for deterministic short scrambles", () =
     assert.equal(solution.ok ? verifySolution(scrambled, solution.moves) : false, true);
   }
 });
+
