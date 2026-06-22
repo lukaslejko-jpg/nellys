@@ -35,7 +35,7 @@ Vrat IBA JSON v tvare:
 {"faces":{"U":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"],"L":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"],"R":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"],"B":["<farba0>","<farba1>","<farba2>","<farba3>","<farba4>","<farba5>","<farba6>","<farba7>","<farba8>"]}}.`;
 
 const DEFAULT_OPENROUTER_VISION_MODEL = "nex-agi/nex-n2-pro:free";
-const DEFAULT_GEMINI_VISION_MODEL = "gemini-2.0-flash";
+const DEFAULT_GEMINI_VISION_MODEL = "gemini-2.5-flash";
 
 function extractJson(text: string): unknown {
   const match = text.match(/\{[\s\S]*\}/);
@@ -196,9 +196,10 @@ async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: 
   }
 
   if (!response.ok) {
+    const details = (await response.text()).slice(0, 240);
     return {
       ok: false,
-      messageSk: `Hlavne rozpoznavanie vratilo HTTP ${response.status}. Skus znova o chvilu alebo pouzi 4 fotky.`
+      messageSk: `Hlavne rozpoznavanie vratilo HTTP ${response.status}: ${details}`
     };
   }
 
@@ -233,9 +234,10 @@ async function analyzeFacesWithGemini(apiKey: string, images: Record<PyraminxFac
   }
 
   if (!response.ok) {
+    const details = (await response.text()).slice(0, 240);
     return {
       ok: false,
-      messageSk: `Hlavne rozpoznavanie vratilo HTTP ${response.status}. Skus znova o chvilu alebo pouzi 4 jasne fotky.`
+      messageSk: `Hlavne rozpoznavanie vratilo HTTP ${response.status}: ${details}`
     };
   }
 
@@ -303,3 +305,4 @@ export async function analyzeFaceImage(dataUrl: string): Promise<AnalyzeFaceResu
     messageSk: errors.join(" | ") || result.messageSk || "Rozpoznanie zlyhalo. Skus 4 jasne fotky pri dobrom svetle."
   };
 }
+
