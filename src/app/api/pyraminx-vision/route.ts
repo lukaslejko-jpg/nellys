@@ -43,13 +43,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, code: "analysis_failed", messageSk: combined.messageSk, requiresRescan: true }, { status: 200 });
   }
 
+  const duplicate = findLikelyDuplicateFaces(combined.faces);
+  if (duplicate) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "duplicate_faces",
+        messageSk: `Snimky ${duplicate[0]} a ${duplicate[1]} vyzeraju ako ta ista strana. Odfot ${duplicate[1]} znova po otoceni celeho ihlana.`,
+        requiresRescan: true
+      },
+      { status: 200 }
+    );
+  }
+
   const decoded = decodeStateFromAnyOrientation(pyraminxFaceIds.map((face) => combined.faces[face]));
-  if (!decoded) {
+  if (!decoded.state) {
     return NextResponse.json(
       {
         ok: false,
         code: "decode_failed",
-        messageSk: "Farby na fotkach nedavaju zmysel pre platny Pyraminx. Skus odfotit vsetky 4 strany znova.",
+        messageSk: `Snimky su nekonzistentne. Automaticka oprava by musela zmenit ${decoded.corrections} nalepiek, povolene su najviac ${MAX_AUTOMATIC_CORRECTIONS}. Odfot kazdu stranu spredu a spickou hore.`,
         requiresRescan: true
       },
       { status: 200 }
@@ -57,6 +70,23 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, state: decoded.state, corrections: decoded.corrections });
+}
+
+function findLikelyDuplicateFaces(faces: Record<PyraminxFaceId, StickerColorId[]>): [PyraminxFaceId, PyraminxFaceId] | null {
+  for (let first = 0; first < pyraminxFaceIds.length; first += 1) {
+    for (let second = first + 1; second < pyraminxFaceIds.length; second += 1) {
+      const faceA = pyraminxFaceIds[first];
+      const faceB = pyraminxFaceIds[second];
+      const colorsA = faces[faceA];
+      const bestDifference = Math.min(
+        ...FACE_ORIENTATION_TRANSFORMS.map((transform) =>
+          transform.reduce((total, sourceIndex, index) => total + Number(colorsA[index] !== faces[faceB][sourceIndex]), 0)
+        )
+      );
+      if (bestDifference <= 1) return [faceA, faceB];
+    }
+  }
+  return null;
 }
 
 function buildFaceAssignments(): FaceId[][] {
@@ -92,7 +122,7 @@ function decodeStateFromAnyOrientation(sampledFaces: StickerColorId[][]) {
 
   return nearest && nearest.mismatches <= MAX_AUTOMATIC_CORRECTIONS
     ? { state: nearest.state, corrections: nearest.mismatches }
-    : null;
+    : { state: null, corrections: nearest?.mismatches ?? 36 };
 }
 
 function findNearestAssignment(
