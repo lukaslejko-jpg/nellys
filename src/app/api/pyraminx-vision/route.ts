@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { pyraminxFaceIds, type PyraminxFaceId, type StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
 import { decodeNearestStateFromFaceColors, decodeStateFromFaceColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
-import { analyzePyraminxImages } from "@/lib/server/ai/anthropic-vision";
+import { analyzePyraminxImagesFast } from "@/lib/server/ai/gemini-fast";
 import { requireActorFromSessionCookie } from "@/lib/server/auth/require-actor";
 
 type RequestBody = {
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
   const completeImages = Object.fromEntries(pyraminxFaceIds.map((face) => [face, images[face]!])) as Record<PyraminxFaceId, string>;
 
-  const combined = await analyzePyraminxImages(completeImages);
+  const combined = await analyzePyraminxImagesFast(completeImages);
   if (!combined.ok) {
     return NextResponse.json({ ok: false, code: "analysis_failed", messageSk: combined.messageSk, requiresRescan: true }, { status: 200 });
   }
@@ -177,4 +177,3 @@ function tryAssignment(
 
   return null;
 }
-
