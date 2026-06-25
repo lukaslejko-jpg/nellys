@@ -1,7 +1,7 @@
 import { pyraminxFaceIds, stickerColorIds, type PyraminxFaceId, type StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
 import type { AnalyzeFacesResult, FaceCellColors } from "@/lib/server/ai/anthropic-vision";
 
-const MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"] as const;
+const MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"] as const;
 const TIMEOUT_MS = 15000;
 
 const PROMPT = `Read the 9 triangular stickers on each of four photos of the same Pyraminx.
@@ -58,7 +58,7 @@ async function callGemini(
 
     if (!response.ok) {
       const details = (await response.text()).slice(0, 220);
-      const retryable = response.status === 429 || response.status === 503 || response.status >= 500;
+      const retryable = response.status === 404 || response.status === 429 || response.status === 503 || response.status >= 500;
       return { ok: false, retryable, messageSk: `Gemini model ${model} vratil HTTP ${response.status}: ${details}` };
     }
 
@@ -74,6 +74,7 @@ async function callGemini(
 function simplifyProviderMessage(message: string): string {
   if (message.includes("HTTP 503")) return "Gemini je teraz pretazena. Skus znova o chvilu alebo nahraj kratsie video.";
   if (message.includes("HTTP 429")) return "Gemini limit je teraz vycerpany. Skus znova neskor alebo pouzi iny API kluc.";
+  if (message.includes("HTTP 404")) return "Gemini model teraz nie je dostupny. Skus znova o chvilu.";
   return message || "Gemini teraz nevratila pouzitelne rozpoznanie.";
 }
 
