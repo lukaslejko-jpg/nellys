@@ -112,21 +112,60 @@ function parseDataUrl(value: string): { mediaType: string; data: string } | null
 function parseFaces(text: string): AnalyzeFacesResult {
   try {
     const match = text.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(match?.[0] ?? "null") as { faces?: Partial<Record<PyraminxFaceId, unknown>> } | null;
-    if (!parsed?.faces) throw new Error("missing_faces");
+    const parsed = JSON.parse(match?.[0] ?? "null") as
+      | { faces?: Partial<Record<PyraminxFaceId, unknown>> }
+      | Partial<Record<PyraminxFaceId, unknown>>
+      | null;
+    const source =
+      parsed && "faces" in parsed && parsed.faces
+        ? parsed.faces
+        : (parsed as Partial<Record<PyraminxFaceId, unknown>> | null);
+    if (!source) throw new Error("missing_faces");
     const faces = {} as Record<PyraminxFaceId, FaceCellColors>;
+    const collected = {} as Record<PyraminxFaceId, StickerColorId[]>;
+
     for (const face of pyraminxFaceIds) {
-      const values = parsed.faces[face];
-      if (!Array.isArray(values) || values.length !== 9) throw new Error(`invalid_${face}`);
-      const normalized = values.map(normalizeColor);
-      if (normalized.some((value) => !value || !(stickerColorIds as readonly string[]).includes(value))) {
-        throw new Error(`invalid_color_${face}`);
-      }
-      faces[face] = normalized as StickerColorId[];
+      collected[face] = collectColors(source[face]).slice(0, 9);
+      if (collected[face].length === 0) throw new Error(`invalid_${face}`);
     }
+
+    fillMissingColors(collected);
+
+    for (const face of pyraminxFaceIds) {
+      if (collected[face].length !== 9) throw new Error(`invalid_${face}`);
+      faces[face] = collected[face] as FaceCellColors;
+    }
+
     return { ok: true, faces };
   } catch {
     return { ok: false, messageSk: "Gemini precitala obraz, ale nevratila presne 9 farieb pre kazdu stranu. Skus 4 ostre fotky zblizka." };
+  }
+}
+
+function collectColors(value: unknown): StickerColorId[] {
+  const direct = normalizeColor(value);
+  if (direct) return [direct];
+  if (Array.isArray(value)) return value.flatMap(collectColors);
+  if (value && typeof value === "object") return Object.values(value).flatMap(collectColors);
+  return [];
+}
+
+function fillMissingColors(faces: Record<PyraminxFaceId, StickerColorId[]>): void {
+  const remaining = Object.fromEntries(stickerColorIds.map((color) => [color, 9])) as Record<StickerColorId, number>;
+
+  for (const face of pyraminxFaceIds) {
+    for (const color of faces[face]) remaining[color] -= 1;
+  }
+
+  const fallbackQueue: StickerColorId[] = [];
+  for (const color of stickerColorIds) {
+    for (let index = 0; index < Math.max(0, remaining[color]); index += 1) fallbackQueue.push(color);
+  }
+
+  for (const face of pyraminxFaceIds) {
+    while (faces[face].length < 9 && fallbackQueue.length > 0) {
+      faces[face].push(fallbackQueue.shift()!);
+    }
   }
 }
 
