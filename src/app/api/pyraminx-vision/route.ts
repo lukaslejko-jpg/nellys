@@ -9,7 +9,7 @@ type RequestBody = {
 };
 
 const FACE_ASSIGNMENTS = buildFaceAssignments();
-const MAX_AUTOMATIC_CORRECTIONS = 8;
+const MAX_AUTOMATIC_CORRECTIONS = 12;
 const FACE_ORIENTATION_TRANSFORMS = [
   [0, 1, 2, 3, 4, 5, 6, 7, 8],
   [4, 3, 5, 6, 8, 7, 1, 2, 0],
