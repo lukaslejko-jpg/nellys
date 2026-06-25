@@ -10,7 +10,7 @@ export function solveManualSession(session: PuzzleSessionSnapshot): SessionSolve
     };
   }
 
-  const solution = solveState(session.correctedState);
+  const solution = solveState(session.correctedState, { maxDepth: 11, maxVisited: 2_000_000 });
 
   if (!solution.ok) {
     return {
