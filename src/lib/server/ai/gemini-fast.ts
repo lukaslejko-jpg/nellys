@@ -1,7 +1,7 @@
 import { pyraminxFaceIds, stickerColorIds, type PyraminxFaceId, type StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
 import type { AnalyzeFacesResult, FaceCellColors } from "@/lib/server/ai/anthropic-vision";
 
-const MODEL = "gemini-2.5-flash-lite";
+const MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"] as const;
 const TIMEOUT_MS = 15000;
 
 const PROMPT = `Read the 9 triangular stickers on each of four photos of the same Pyraminx.
@@ -23,7 +23,29 @@ export async function analyzePyraminxImagesFast(images: Record<PyraminxFaceId, s
   }
 
   try {
-    const model = process.env.GEMINI_VISION_MODEL ?? MODEL;
+    const models = process.env.GEMINI_VISION_MODEL ? [process.env.GEMINI_VISION_MODEL] : MODELS;
+    let lastProviderMessage = "";
+
+    for (const model of models) {
+      const result = await callGemini(model, apiKey, parts);
+      if (result.ok) return result;
+      lastProviderMessage = result.messageSk;
+      if (!result.retryable) return { ok: false, messageSk: result.messageSk };
+    }
+
+    return { ok: false, messageSk: simplifyProviderMessage(lastProviderMessage) };
+  } catch (error) {
+    const timedOut = error instanceof DOMException && error.name === "TimeoutError";
+    return { ok: false, messageSk: timedOut ? "Gemini neodpovedalo do 15 sekund." : "Spojenie s Gemini zlyhalo." };
+  }
+}
+
+async function callGemini(
+  model: string,
+  apiKey: string,
+  parts: ({ text: string } | { inline_data: { mime_type: string; data: string } })[]
+): Promise<(AnalyzeFacesResult & { retryable?: boolean }) | { ok: false; messageSk: string; retryable: boolean }> {
+  try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -36,7 +58,8 @@ export async function analyzePyraminxImagesFast(images: Record<PyraminxFaceId, s
 
     if (!response.ok) {
       const details = (await response.text()).slice(0, 220);
-      return { ok: false, messageSk: `Gemini vratilo HTTP ${response.status}: ${details}` };
+      const retryable = response.status === 429 || response.status === 503 || response.status >= 500;
+      return { ok: false, retryable, messageSk: `Gemini model ${model} vratil HTTP ${response.status}: ${details}` };
     }
 
     const body = (await response.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
@@ -44,8 +67,14 @@ export async function analyzePyraminxImagesFast(images: Record<PyraminxFaceId, s
     return parseFaces(text);
   } catch (error) {
     const timedOut = error instanceof DOMException && error.name === "TimeoutError";
-    return { ok: false, messageSk: timedOut ? "Gemini neodpovedalo do 15 sekund." : "Spojenie s Gemini zlyhalo." };
+    return { ok: false, retryable: timedOut, messageSk: timedOut ? `Gemini model ${model} neodpovedal do 15 sekund.` : "Spojenie s Gemini zlyhalo." };
   }
+}
+
+function simplifyProviderMessage(message: string): string {
+  if (message.includes("HTTP 503")) return "Gemini je teraz pretazena. Skus znova o chvilu alebo nahraj kratsie video.";
+  if (message.includes("HTTP 429")) return "Gemini limit je teraz vycerpany. Skus znova neskor alebo pouzi iny API kluc.";
+  return message || "Gemini teraz nevratila pouzitelne rozpoznanie.";
 }
 
 function parseDataUrl(value: string): { mediaType: string; data: string } | null {
