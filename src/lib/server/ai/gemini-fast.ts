@@ -8,7 +8,24 @@ const PROMPT = `Read the 9 triangular stickers on each of four photos of the sam
 Photos are labeled U, L, R, B. A face has rows of 1, 3 and 5 stickers, read top-to-bottom and left-to-right.
 Allowed colors are red, green, blue, yellow. Across all photos there must be exactly 9 of each color.
 The photos may be rotated. Ignore background, fingers and shadows. Do not solve the puzzle and do not invent moves.
-Return JSON only: {"faces":{"U":[9 colors],"L":[9 colors],"R":[9 colors],"B":[9 colors]}}.`;
+Return JSON only. Every face array must contain exactly 9 lowercase strings.`;
+
+const RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    faces: {
+      type: "OBJECT",
+      properties: {
+        U: faceSchema(),
+        L: faceSchema(),
+        R: faceSchema(),
+        B: faceSchema()
+      },
+      required: ["U", "L", "R", "B"]
+    }
+  },
+  required: ["faces"]
+};
 
 export async function analyzePyraminxImagesFast(images: Record<PyraminxFaceId, string>): Promise<AnalyzeFacesResult> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -52,7 +69,7 @@ async function callGemini(
       signal: AbortSignal.timeout(TIMEOUT_MS),
       body: JSON.stringify({
         contents: [{ parts }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0, maxOutputTokens: 700 }
+        generationConfig: { responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA, temperature: 0, maxOutputTokens: 1200 }
       })
     });
 
@@ -78,6 +95,15 @@ function simplifyProviderMessage(message: string): string {
   return message || "Gemini teraz nevratila pouzitelne rozpoznanie.";
 }
 
+function faceSchema() {
+  return {
+    type: "ARRAY",
+    minItems: 9,
+    maxItems: 9,
+    items: { type: "STRING", enum: ["red", "green", "blue", "yellow"] }
+  };
+}
+
 function parseDataUrl(value: string): { mediaType: string; data: string } | null {
   const match = value.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
   return match ? { mediaType: match[1], data: match[2] } : null;
@@ -92,13 +118,24 @@ function parseFaces(text: string): AnalyzeFacesResult {
     for (const face of pyraminxFaceIds) {
       const values = parsed.faces[face];
       if (!Array.isArray(values) || values.length !== 9) throw new Error(`invalid_${face}`);
-      if (values.some((value) => typeof value !== "string" || !(stickerColorIds as readonly string[]).includes(value))) {
+      const normalized = values.map(normalizeColor);
+      if (normalized.some((value) => !value || !(stickerColorIds as readonly string[]).includes(value))) {
         throw new Error(`invalid_color_${face}`);
       }
-      faces[face] = values as StickerColorId[];
+      faces[face] = normalized as StickerColorId[];
     }
     return { ok: true, faces };
   } catch {
-    return { ok: false, messageSk: `Gemini nevratilo citatelnych 9 farieb pre kazdu stranu. Odpoved: ${text.slice(0, 180)}` };
+    return { ok: false, messageSk: "Gemini precitala obraz, ale nevratila presne 9 farieb pre kazdu stranu. Skus 4 ostre fotky zblizka." };
   }
+}
+
+function normalizeColor(value: unknown): StickerColorId | null {
+  if (typeof value !== "string") return null;
+  const color = value.trim().toLowerCase();
+  if (color === "red" || color === "cervena" || color === "červená") return "red";
+  if (color === "green" || color === "zelena" || color === "zelená") return "green";
+  if (color === "blue" || color === "modra" || color === "modrá") return "blue";
+  if (color === "yellow" || color === "zlta" || color === "žltá") return "yellow";
+  return null;
 }
