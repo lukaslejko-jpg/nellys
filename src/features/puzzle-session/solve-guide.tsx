@@ -21,10 +21,12 @@ const FACES: Record<
   FaceKey,
   { points: [number, number][]; apexIdx: number; faceId: FaceId; labelPos: [number, number]; label: string }
 > = {
-  top: { points: [[50, 8], [72, 48], [28, 48]], apexIdx: 0, faceId: "U", labelPos: [50, 30], label: "HORE" },
-  left: { points: [[28, 48], [50, 88], [6, 88]], apexIdx: 2, faceId: "L", labelPos: [28, 70], label: "VLAVO" },
-  right: { points: [[72, 48], [94, 88], [50, 88]], apexIdx: 1, faceId: "R", labelPos: [72, 70], label: "VPRAVO" },
-  center: { points: [[28, 48], [72, 48], [50, 88]], apexIdx: 2, faceId: "B", labelPos: [50, 65], label: "K TEBE" }
+  // points are ordered [own vertex, c1, c2] to match FACE_VERTICES in stickers.ts,
+  // so subdivideFace's cell 0/4/8 (tip near a/b/c) lines up with faceStickerColors' cell 0/4/8.
+  top: { points: [[50, 8], [28, 48], [72, 48]], apexIdx: 0, faceId: "U", labelPos: [50, 30], label: "HORE" },
+  left: { points: [[28, 48], [6, 88], [50, 88]], apexIdx: 0, faceId: "L", labelPos: [28, 70], label: "VLAVO" },
+  right: { points: [[72, 48], [94, 88], [50, 88]], apexIdx: 0, faceId: "R", labelPos: [72, 70], label: "VPRAVO" },
+  center: { points: [[50, 88], [28, 48], [72, 48]], apexIdx: 0, faceId: "B", labelPos: [50, 65], label: "K TEBE" }
 };
 
 const FACE_INFO: Record<string, { label: string; face: FaceKey; color: string }> = {
