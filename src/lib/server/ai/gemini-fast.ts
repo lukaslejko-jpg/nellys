@@ -69,7 +69,13 @@ async function callGemini(
       signal: AbortSignal.timeout(TIMEOUT_MS),
       body: JSON.stringify({
         contents: [{ parts }],
-        generationConfig: { responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA, temperature: 0, maxOutputTokens: 1200 }
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA,
+          temperature: 0,
+          maxOutputTokens: 2048,
+          thinkingConfig: { thinkingBudget: 0 }
+        }
       })
     });
 
@@ -81,7 +87,8 @@ async function callGemini(
 
     const body = (await response.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
     const text = body.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
-    return parseFaces(text);
+    const parsed = parseFaces(text);
+    return parsed.ok ? parsed : { ...parsed, retryable: true };
   } catch (error) {
     const timedOut = error instanceof DOMException && error.name === "TimeoutError";
     return { ok: false, retryable: timedOut, messageSk: timedOut ? `Gemini model ${model} neodpovedal do 15 sekund.` : "Spojenie s Gemini zlyhalo." };
