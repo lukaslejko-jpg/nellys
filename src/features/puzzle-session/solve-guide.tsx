@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { baseFace, turnCount, type PyraminxMove } from "@/lib/domain/pyraminx/moves";
-import { applySequence } from "@/lib/domain/pyraminx/simulator";
+import { applyMove, applySequence } from "@/lib/domain/pyraminx/simulator";
 import { createSolvedState, type PyraminxState } from "@/lib/domain/pyraminx/state";
 import { faceStickerColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
 import type { StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
@@ -104,6 +104,23 @@ export function SolveGuide({
 
   const baseState = initialState ?? createSolvedState();
   const stateAtStep = useMemo(() => applySequence(baseState, moves.slice(0, stepIndex)), [baseState, moves, stepIndex]);
+  const stateAfterStep = useMemo(() => (move ? applyMove(stateAtStep, move) : stateAtStep), [stateAtStep, move]);
+
+  const changedCellsByFace = useMemo(() => {
+    const result: Partial<Record<FaceId, Set<number>>> = {};
+    if (!move) return result;
+    (Object.keys(FACES) as FaceKey[]).forEach((key) => {
+      const faceId = FACES[key].faceId;
+      const before = faceStickerColors(stateAtStep, faceId);
+      const after = faceStickerColors(stateAfterStep, faceId);
+      const changed = new Set<number>();
+      before.forEach((color, idx) => {
+        if (color !== after[idx]) changed.add(idx);
+      });
+      if (changed.size > 0) result[faceId] = changed;
+    });
+    return result;
+  }, [stateAtStep, stateAfterStep, move]);
 
   useEffect(() => {
     setStepIndex(0);
@@ -174,32 +191,36 @@ export function SolveGuide({
         <svg className="solve-triangle" viewBox="0 0 100 100" aria-hidden="true">
           {(Object.keys(FACES) as FaceKey[]).map((key) => {
             const face = FACES[key];
-            const isActive = info?.face === key;
+            const changedCells = changedCellsByFace[face.faceId];
+            const isActive = !!changedCells && changedCells.size > 0;
             const cells = subdivideFace(face.points, face.apexIdx);
             const cellColors = faceStickerColors(stateAtStep, face.faceId);
+            const markCell = changedCells ? cells[Math.min(...changedCells)] : undefined;
             return (
               <g key={key}>
                 {cells.map((cell, idx) => (
-                  <polygon key={idx} className="solve-piece" points={pointsAttr(cell)} style={{ fill: STICKER_COLOR[cellColors[idx]] }} />
+                  <polygon
+                    key={idx}
+                    className={changedCells?.has(idx) ? "solve-piece solve-piece-active" : "solve-piece"}
+                    points={pointsAttr(cell)}
+                    style={{ fill: STICKER_COLOR[cellColors[idx]] }}
+                  />
                 ))}
                 <polygon
                   className={isActive ? "solve-face-outline solve-face-outline-active" : "solve-face-outline"}
                   points={pointsAttr(face.points)}
                 />
-                {isActive ? (
-                  <>
-                    <polygon className="solve-piece-active" points={pointsAttr(cells[0])} />
-                    <text
-                      x={centroid(cells[0])[0]}
-                      y={centroid(cells[0])[1]}
-                      className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      style={{ transformOrigin: `${centroid(cells[0])[0]}px ${centroid(cells[0])[1]}px` }}
-                    >
-                      {ccw ? "CCW" : "CW"}
-                    </text>
-                  </>
+                {isActive && markCell ? (
+                  <text
+                    x={centroid(markCell)[0]}
+                    y={centroid(markCell)[1]}
+                    className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    style={{ transformOrigin: `${centroid(markCell)[0]}px ${centroid(markCell)[1]}px` }}
+                  >
+                    {ccw ? "CCW" : "CW"}
+                  </text>
                 ) : null}
                 <text x={face.labelPos[0]} y={face.labelPos[1]} className="solve-face-label" textAnchor="middle">
                   {face.label}
