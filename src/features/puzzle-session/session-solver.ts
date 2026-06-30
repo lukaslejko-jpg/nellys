@@ -16,7 +16,8 @@ export function solveManualSession(session: PuzzleSessionSnapshot): SessionSolve
     return {
       ok: false,
       code: "SOLVER_FAILED",
-      messageSk: "Solver nenasiel overene riesenie v nastavenom limite."
+      messageSk:
+        "AI pravdepodobne nespravne precitala aspon jednu nalepku z fotiek, takze rozpoznany stav sa neda poskladat. Sken znova na svetlom jednofarebnom podklade a pri dobrom osvetleni."
     };
   }
 
