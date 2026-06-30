@@ -3,6 +3,8 @@ import { createManualSessionForActorHandler } from "@/features/puzzle-session/ap
 import { createPuzzleSessionService } from "@/features/puzzle-session/service-factory";
 import { requireActorFromSessionCookie } from "@/lib/server/auth/require-actor";
 
+export const maxDuration = 30;
+
 export async function POST() {
   const actor = await requireActorFromSessionCookie();
   if (!actor.ok) {

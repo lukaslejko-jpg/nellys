@@ -97,15 +97,15 @@ async function recognizeStateFromPhotos(captures: CapturedFace[], signal?: Abort
   return postJson<VisionResult>("/api/pyraminx-vision", { images }, signal);
 }
 
-async function computeSolution(state: PyraminxState, signal?: AbortSignal): Promise<{ moves: string[] | null; status: string }> {
+async function computeSolution(state: PyraminxState): Promise<{ moves: string[] | null; status: string }> {
   try {
-    const created = await postJson<ApiResult>("/api/puzzle-sessions", undefined, signal);
+    const created = await postJson<ApiResult>("/api/puzzle-sessions", undefined, timeoutSignal());
     if (!created.ok) return { moves: null, status: created.messageSk ?? "Nepodarilo sa vytvorit riesenie." };
 
-    const saved = await putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, { correctedState: state }, signal);
+    const saved = await putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, { correctedState: state }, timeoutSignal());
     if (!saved.ok) return { moves: null, status: saved.messageSk ?? "Nepodarilo sa ulozit rozpoznany stav." };
 
-    const solved = await postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`, undefined, signal);
+    const solved = await postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`, undefined, timeoutSignal());
     if (!solved.ok) return { moves: null, status: solved.messageSk ?? "Solver nevie tento stav vyriesit." };
 
     return { moves: solved.session.solution ?? [], status: "" };
@@ -113,6 +113,10 @@ async function computeSolution(state: PyraminxState, signal?: AbortSignal): Prom
     if (isAbortError(error)) return { moves: null, status: "Solver odpovedal prilis pomaly. Skus znova." };
     return { moves: null, status: "Poziadavka zlyhala. Skontroluj internet a prihlasenie." };
   }
+}
+
+function timeoutSignal(): AbortSignal {
+  return AbortSignal.timeout(SOLVER_TIMEOUT_MS);
 }
 
 function waitForVideoEvent(video: HTMLVideoElement, eventName: keyof HTMLMediaElementEventMap): Promise<void> {
@@ -255,10 +259,7 @@ export function PhotoUploadPanel() {
     setMessage("Stav je precitany. Solver teraz pocita a overuje tahy.");
     speakText("Stav sedi. Pocitam riesenie.");
 
-    const solveController = new AbortController();
-    const solveTimeoutId = window.setTimeout(() => solveController.abort(), SOLVER_TIMEOUT_MS);
-    const solved = await computeSolution(recognized.state, solveController.signal);
-    window.clearTimeout(solveTimeoutId);
+    const solved = await computeSolution(recognized.state);
 
     if (activeJobRef.current !== jobId) return;
     if (!solved.moves) {
