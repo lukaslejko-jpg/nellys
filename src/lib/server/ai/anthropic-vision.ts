@@ -117,7 +117,8 @@ async function analyzeWithOpenRouter(apiKey: string, dataUrl: string): Promise<A
             ]
           }
         ]
-      })
+      }),
+      signal: AbortSignal.timeout(20000)
     });
   } catch {
     return { ok: false, messageSk: "Nepodarilo sa spojit s rozpoznavanim fotiek." };
@@ -160,7 +161,8 @@ async function analyzeFacesWithOpenRouter(apiKey: string, images: Record<Pyramin
             ]
           }
         ]
-      })
+      }),
+      signal: AbortSignal.timeout(20000)
     });
   } catch {
     return { ok: false, messageSk: "Nepodarilo sa spojit s rozpoznavanim fotiek." };
@@ -188,7 +190,8 @@ async function analyzeWithGemini(apiKey: string, mediaType: string, base64Data: 
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mediaType, data: base64Data } }] }]
-        })
+        }),
+        signal: AbortSignal.timeout(20000)
       }
     );
   } catch {
@@ -226,7 +229,8 @@ async function analyzeFacesWithGemini(apiKey: string, images: Record<PyraminxFac
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts }] })
+        body: JSON.stringify({ contents: [{ parts }] }),
+        signal: AbortSignal.timeout(20000)
       }
     );
   } catch {

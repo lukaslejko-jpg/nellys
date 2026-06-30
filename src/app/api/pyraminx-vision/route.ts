@@ -5,6 +5,8 @@ import { analyzePyraminxImagesFast } from "@/lib/server/ai/gemini-fast";
 import { analyzePyraminxImages } from "@/lib/server/ai/anthropic-vision";
 import { requireActorFromSessionCookie } from "@/lib/server/auth/require-actor";
 
+export const maxDuration = 60;
+
 type RequestBody = {
   images?: Partial<Record<PyraminxFaceId, string>>;
 };
