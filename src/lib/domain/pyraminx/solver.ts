@@ -1,4 +1,4 @@
-import { inverseMove, legalMoves, type PyraminxMove } from "./moves.ts";
+import { inverseMove, inverseSequence, legalMoves, type PyraminxMove } from "./moves.ts";
 import { applySequence, applyMove } from "./simulator.ts";
 import { createSolvedState, isSolved, stateKey, type PyraminxState } from "./state.ts";
 import { validateStateShape } from "./validator.ts";
@@ -37,43 +37,86 @@ export function solveState(state: PyraminxState, options: SolveOptions = {}): So
 
   const maxDepth = options.maxDepth ?? 7;
   const maxVisited = options.maxVisited ?? 200_000;
-  const solvedKey = stateKey(createSolvedState());
-  const queue: QueueItem[] = [{ state, moves: [] }];
-  const seen = new Set<string>([stateKey(state)]);
-  let cursor = 0;
 
-  while (cursor < queue.length) {
-    const item = queue[cursor];
-    cursor += 1;
+  // Bidirectional BFS: search forward from `state` and backward from the
+  // solved state at the same time, meeting in the middle. This explores
+  // roughly 2*branchingFactor^(maxDepth/2) states instead of
+  // branchingFactor^maxDepth, which is the difference between finishing in
+  // milliseconds and timing out the request for deep (>=9 move) scrambles.
+  const solvedState = createSolvedState();
+  const startKey = stateKey(state);
+  const solvedKey = stateKey(solvedState);
 
-    if (cursor > maxVisited) {
-      return { ok: false, error: "SOLVER_VISITED_LIMIT", visited: cursor };
-    }
+  const forwardDepth = Math.floor(maxDepth / 2);
+  const backwardDepth = maxDepth - forwardDepth;
 
-    if (item.moves.length >= maxDepth) {
-      continue;
-    }
+  const forwardVisited = new Map<string, PyraminxMove[]>([[startKey, []]]);
+  const backwardVisited = new Map<string, PyraminxMove[]>([[solvedKey, []]]);
+  let forwardFrontier: QueueItem[] = [{ state, moves: [] }];
+  let backwardFrontier: QueueItem[] = [{ state: solvedState, moves: [] }];
+  let forwardLevel = 0;
+  let backwardLevel = 0;
+  let visited = 2;
 
-    const previous = item.moves[item.moves.length - 1];
+  const meetAt = (key: string): SolveResult | null => {
+    const forwardMoves = forwardVisited.get(key);
+    const backwardMoves = backwardVisited.get(key);
+    if (forwardMoves === undefined || backwardMoves === undefined) return null;
 
-    for (const move of legalMoves) {
-      if (!withoutImmediateUndo(previous, move)) continue;
+    const moves = [...forwardMoves, ...inverseSequence(backwardMoves)];
+    return verifySolution(state, moves)
+      ? { ok: true, moves, verified: true, visited }
+      : { ok: false, error: "SOLVER_VERIFICATION_FAILED", visited };
+  };
 
-      const nextState = applyMove(item.state, move);
-      const key = stateKey(nextState);
-      if (seen.has(key)) continue;
+  while (
+    (forwardLevel < forwardDepth && forwardFrontier.length > 0) ||
+    (backwardLevel < backwardDepth && backwardFrontier.length > 0)
+  ) {
+    const expandForward =
+      forwardLevel < forwardDepth &&
+      forwardFrontier.length > 0 &&
+      (backwardLevel >= backwardDepth || backwardFrontier.length === 0 || forwardFrontier.length <= backwardFrontier.length);
 
-      const moves = [...item.moves, move];
-      if (key === solvedKey) {
-        return verifySolution(state, moves)
-          ? { ok: true, moves, verified: true, visited: cursor }
-          : { ok: false, error: "SOLVER_VERIFICATION_FAILED", visited: cursor };
+    const frontier = expandForward ? forwardFrontier : backwardFrontier;
+    const ownVisited = expandForward ? forwardVisited : backwardVisited;
+    const otherVisited = expandForward ? backwardVisited : forwardVisited;
+    const nextFrontier: QueueItem[] = [];
+
+    for (const item of frontier) {
+      const previous = item.moves[item.moves.length - 1];
+
+      for (const move of legalMoves) {
+        if (!withoutImmediateUndo(previous, move)) continue;
+
+        const nextState = applyMove(item.state, move);
+        const key = stateKey(nextState);
+        if (ownVisited.has(key)) continue;
+
+        const moves = [...item.moves, move];
+        ownVisited.set(key, moves);
+        visited += 1;
+        if (visited > maxVisited) {
+          return { ok: false, error: "SOLVER_VISITED_LIMIT", visited };
+        }
+
+        if (otherVisited.has(key)) {
+          const result = meetAt(key);
+          if (result) return result;
+        }
+
+        nextFrontier.push({ state: nextState, moves });
       }
+    }
 
-      seen.add(key);
-      queue.push({ state: nextState, moves });
+    if (expandForward) {
+      forwardFrontier = nextFrontier;
+      forwardLevel += 1;
+    } else {
+      backwardFrontier = nextFrontier;
+      backwardLevel += 1;
     }
   }
 
-  return { ok: false, error: "SOLVER_DEPTH_LIMIT", visited: cursor };
+  return { ok: false, error: "SOLVER_DEPTH_LIMIT", visited };
 }
