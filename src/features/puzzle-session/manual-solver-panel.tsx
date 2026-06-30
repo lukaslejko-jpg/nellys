@@ -18,7 +18,7 @@ type VisionResult =
 type SolveStatus = "idle" | "capturing" | "analyzing" | "solving" | "ready" | "needs_rescan" | "error";
 
 const ANALYSIS_TIMEOUT_MS = 60000;
-const SOLVER_TIMEOUT_MS = 15000;
+const SOLVER_TIMEOUT_MS = 30000;
 
 async function blobUrlToDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
