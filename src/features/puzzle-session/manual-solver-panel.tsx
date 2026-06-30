@@ -97,21 +97,33 @@ async function recognizeStateFromPhotos(captures: CapturedFace[], signal?: Abort
   return postJson<VisionResult>("/api/pyraminx-vision", { images }, signal);
 }
 
+async function withStepErrors<T>(stepLabel: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (isAbortError(error)) throw new Error(`Krok "${stepLabel}" neodpovedal do ${SOLVER_TIMEOUT_MS / 1000}s. Skus znova.`);
+    throw new Error(`Krok "${stepLabel}" zlyhal. Skontroluj internet a prihlasenie.`);
+  }
+}
+
 async function computeSolution(state: PyraminxState): Promise<{ moves: string[] | null; status: string }> {
   try {
-    const created = await postJson<ApiResult>("/api/puzzle-sessions", undefined, timeoutSignal());
+    const created = await withStepErrors("vytvorenie session", () => postJson<ApiResult>("/api/puzzle-sessions", undefined, timeoutSignal()));
     if (!created.ok) return { moves: null, status: created.messageSk ?? "Nepodarilo sa vytvorit riesenie." };
 
-    const saved = await putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, { correctedState: state }, timeoutSignal());
+    const saved = await withStepErrors("ulozenie stavu", () =>
+      putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, { correctedState: state }, timeoutSignal())
+    );
     if (!saved.ok) return { moves: null, status: saved.messageSk ?? "Nepodarilo sa ulozit rozpoznany stav." };
 
-    const solved = await postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`, undefined, timeoutSignal());
+    const solved = await withStepErrors("vypocet riesenia", () =>
+      postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`, undefined, timeoutSignal())
+    );
     if (!solved.ok) return { moves: null, status: solved.messageSk ?? "Solver nevie tento stav vyriesit." };
 
     return { moves: solved.session.solution ?? [], status: "" };
   } catch (error) {
-    if (isAbortError(error)) return { moves: null, status: "Solver odpovedal prilis pomaly. Skus znova." };
-    return { moves: null, status: "Poziadavka zlyhala. Skontroluj internet a prihlasenie." };
+    return { moves: null, status: error instanceof Error ? error.message : "Poziadavka zlyhala." };
   }
 }
 
