@@ -220,7 +220,6 @@ export function decodeNearestStateFromFaceColors(faceColors: Record<FaceId, Stic
   }
 
   const edgeCosts = Array.from({ length: 6 }, () => new Array<number>(6).fill(0));
-  const edgeOrientations = Array.from({ length: 6 }, () => new Array<0 | 1>(6).fill(0));
 
   for (let position = 0; position < 6; position += 1) {
     const edge = position as EdgeId;
@@ -232,10 +231,10 @@ export function decodeNearestStateFromFaceColors(faceColors: Record<FaceId, Stic
     for (let pieceIndex = 0; pieceIndex < 6; pieceIndex += 1) {
       const piece = pieceIndex as EdgeId;
       const home = [FACE_COLOR[EDGE_FACES[piece][0]], FACE_COLOR[EDGE_FACES[piece][1]]];
-      const normalCost = Number(displayed[0] !== home[0]) + Number(displayed[1] !== home[1]);
-      const flippedCost = Number(displayed[0] !== home[1]) + Number(displayed[1] !== home[0]);
-      edgeCosts[position][piece] = Math.min(normalCost, flippedCost);
-      edgeOrientations[position][piece] = flippedCost < normalCost ? 1 : 0;
+      // Pyraminx edges never flip during legal moves (simulator only relocates orientation
+      // values, never changes them, and all reachable states start from edgesOri=[0..0]).
+      // Only count the cost of placing this piece in its natural orientation (ori=0).
+      edgeCosts[position][piece] = Number(displayed[0] !== home[0]) + Number(displayed[1] !== home[1]);
     }
   }
 
@@ -260,14 +259,41 @@ export function decodeNearestStateFromFaceColors(faceColors: Record<FaceId, Stic
   }
 
   const edgesPerm = new Array<EdgeId>(6).fill(0) as PyraminxState["edgesPerm"];
-  const edgesOri = new Array<0 | 1>(6).fill(0) as PyraminxState["edgesOri"];
   let mask = fullMask;
   for (let position = 5; position >= 0; position -= 1) {
-    const piece = chosenPieces[mask] as EdgeId;
-    edgesPerm[position] = piece;
-    edgesOri[position] = edgeOrientations[position][piece];
+    edgesPerm[position] = chosenPieces[mask] as EdgeId;
     mask = previousMasks[mask];
   }
+
+  // All reachable Pyraminx states have even edge permutation (every legal move is
+  // a 3-cycle = even permutation). If the DP chose an odd permutation (possible when
+  // the best greedy assignment happens to be odd), swap the cheapest pair of positions
+  // to restore even parity without exploding the mismatch count.
+  if (!isEvenPermutation(edgesPerm)) {
+    let bestExtraCost = Number.POSITIVE_INFINITY;
+    let swapI = 0;
+    let swapJ = 1;
+    for (let i = 0; i < 6; i += 1) {
+      for (let j = i + 1; j < 6; j += 1) {
+        const extraCost =
+          edgeCosts[i][edgesPerm[j]] +
+          edgeCosts[j][edgesPerm[i]] -
+          edgeCosts[i][edgesPerm[i]] -
+          edgeCosts[j][edgesPerm[j]];
+        if (extraCost < bestExtraCost) {
+          bestExtraCost = extraCost;
+          swapI = i;
+          swapJ = j;
+        }
+      }
+    }
+    const tmp = edgesPerm[swapI];
+    edgesPerm[swapI] = edgesPerm[swapJ];
+    edgesPerm[swapJ] = tmp;
+    mismatches += Math.max(0, bestExtraCost);
+  }
+
+  const edgesOri = new Array<0 | 1>(6).fill(0) as PyraminxState["edgesOri"];
 
   return {
     state: { tips, centers, edgesPerm, edgesOri },
@@ -295,5 +321,15 @@ function bitCount(value: number): number {
   let count = 0;
   for (let current = value; current > 0; current >>= 1) count += current & 1;
   return count;
+}
+
+function isEvenPermutation(perm: number[]): boolean {
+  let inversions = 0;
+  for (let i = 0; i < perm.length; i += 1) {
+    for (let j = i + 1; j < perm.length; j += 1) {
+      if (perm[i] > perm[j]) inversions += 1;
+    }
+  }
+  return inversions % 2 === 0;
 }
 
