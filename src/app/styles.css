@@ -894,29 +894,11 @@ h2 {
 
 .solve-mark-arrow {
   fill: var(--navy);
-  font-size: 14px;
+  font-size: 22px;
   font-weight: 800;
   paint-order: stroke;
   stroke: #ffffff;
-  stroke-width: 0.6;
-}
-
-.solve-mark-arrow.cw {
-  animation: solve-spin-cw 1.4s linear infinite;
-}
-
-.solve-mark-arrow.ccw {
-  animation: solve-spin-ccw 1.4s linear infinite;
-}
-
-@keyframes solve-spin-cw {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(120deg); }
-}
-
-@keyframes solve-spin-ccw {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(-120deg); }
+  stroke-width: 1;
 }
 
 .solve-color-dot {
@@ -1246,6 +1228,18 @@ h2 {
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.live-coach-move {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.live-coach-arrow {
+  color: var(--blue);
+  font-size: 40px;
+  line-height: 1;
 }
 
 .live-coach strong {
