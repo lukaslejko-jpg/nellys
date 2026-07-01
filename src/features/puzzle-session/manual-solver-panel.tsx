@@ -91,9 +91,7 @@ async function putJson<T>(url: string, body: unknown, signal?: AbortSignal): Pro
 
 async function recognizeStateFromPhotos(captures: CapturedFace[], signal?: AbortSignal): Promise<VisionResult> {
   const images: Partial<Record<PyraminxFaceId, string>> = {};
-  for (const capture of captures) {
-    images[capture.face] = await blobUrlToDataUrl(capture.url);
-  }
+  for (const capture of captures) images[capture.face] = await blobUrlToDataUrl(capture.url);
   return postJson<VisionResult>("/api/pyraminx-vision", { images }, signal);
 }
 
@@ -110,17 +108,10 @@ async function computeSolution(state: PyraminxState): Promise<{ moves: string[] 
   try {
     const created = await withStepErrors("vytvorenie session", () => postJson<ApiResult>("/api/puzzle-sessions", undefined, timeoutSignal()));
     if (!created.ok) return { moves: null, status: created.messageSk ?? "Nepodarilo sa vytvorit riesenie." };
-
-    const saved = await withStepErrors("ulozenie stavu", () =>
-      putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, { correctedState: state }, timeoutSignal())
-    );
+    const saved = await withStepErrors("ulozenie stavu", () => putJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/state`, { correctedState: state }, timeoutSignal()));
     if (!saved.ok) return { moves: null, status: saved.messageSk ?? "Nepodarilo sa ulozit rozpoznany stav." };
-
-    const solved = await withStepErrors("vypocet riesenia", () =>
-      postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`, undefined, timeoutSignal())
-    );
+    const solved = await withStepErrors("vypocet riesenia", () => postJson<ApiResult>(`/api/puzzle-sessions/${created.session.id}/solve`, undefined, timeoutSignal()));
     if (!solved.ok) return { moves: null, status: solved.messageSk ?? "Solver nevie tento stav vyriesit." };
-
     return { moves: solved.session.solution ?? [], status: "" };
   } catch (error) {
     return { moves: null, status: error instanceof Error ? error.message : "Poziadavka zlyhala." };
@@ -133,14 +124,8 @@ function timeoutSignal(): AbortSignal {
 
 function waitForVideoEvent(video: HTMLVideoElement, eventName: keyof HTMLMediaElementEventMap): Promise<void> {
   return new Promise((resolve, reject) => {
-    const onEvent = () => {
-      cleanup();
-      resolve();
-    };
-    const onError = () => {
-      cleanup();
-      reject(new Error("video_error"));
-    };
+    const onEvent = () => { cleanup(); resolve(); };
+    const onError = () => { cleanup(); reject(new Error("video_error")); };
     const cleanup = () => {
       video.removeEventListener(eventName, onEvent);
       video.removeEventListener("error", onError);
@@ -157,27 +142,23 @@ async function extractVideoFrames(file: File): Promise<CapturedFace[]> {
   video.muted = true;
   video.playsInline = true;
   video.preload = "metadata";
-
   try {
     await waitForVideoEvent(video, "loadedmetadata");
     const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 4;
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("canvas_error");
-
     const captures: CapturedFace[] = [];
     for (let index = 0; index < pyraminxFaceIds.length; index += 1) {
       const time = duration * ((index + 0.5) / pyraminxFaceIds.length);
       video.currentTime = Math.min(duration - 0.05, Math.max(0, time));
       await waitForVideoEvent(video, "seeked");
-
       const size = Math.min(video.videoWidth, video.videoHeight, 512) || 512;
       canvas.width = size;
       canvas.height = size;
       const sx = Math.max(0, (video.videoWidth - size) / 2);
       const sy = Math.max(0, (video.videoHeight - size) / 2);
       ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
-
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
       if (!blob) throw new Error("frame_error");
       captures.push({ face: pyraminxFaceIds[index], url: URL.createObjectURL(blob) });
@@ -193,9 +174,7 @@ function toUserRescanMessage(text?: string): string {
   if (/quota|429/i.test(text)) return "Gemini limit je docasne vycerpany. Skus znovu neskor alebo nastav iny Gemini API kluc.";
   if (/GEMINI_API_KEY|quota|429|404|model|Gemini|OpenRouter|API/i.test(text)) return text;
   if (/platny|Farby|decode/i.test(text)) return "Farby nedavaju platny Pyraminx stav. Ukaz kazdu zo 4 stran samostatne, rovno, zblizka a bez prstov cez nalepky.";
-  return text.includes("AI rozpoznanie teraz neodpovedalo pouzitelne")
-    ? "Rozpoznavanie zlyhalo u poskytovatela. Skontroluj Vercel logs alebo kluc pre rozpoznavanie."
-    : text;
+  return text.includes("AI rozpoznanie teraz neodpovedalo pouzitelne") ? "Rozpoznavanie zlyhalo u poskytovatela. Skontroluj Vercel logs alebo kluc pre rozpoznavanie." : text;
 }
 
 export function PhotoUploadPanel() {
@@ -208,6 +187,7 @@ export function PhotoUploadPanel() {
   const [status, setStatus] = useState<SolveStatus>("idle");
   const [soundEnabled, setSoundEnabled] = useState(false);
   const activeJobRef = useRef(0);
+  const isReady = status === "ready" && !!moves && !!scrambleState;
 
   function speakText(text: string) {
     if (!soundEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -247,7 +227,6 @@ export function PhotoUploadPanel() {
     setStatus("analyzing");
     setMessage("Mam 4 snimky. Zmensujem ich a Gemini cita farby. Cakam najviac 60 sekund.");
     speakText("Mam snimky. Citam farby.");
-
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
     let recognized: VisionResult;
@@ -260,31 +239,18 @@ export function PhotoUploadPanel() {
     } finally {
       window.clearTimeout(timeoutId);
     }
-
     if (activeJobRef.current !== jobId) return;
-    if (!recognized.ok) {
-      askForRescan(recognized.messageSk);
-      return;
-    }
-
+    if (!recognized.ok) { askForRescan(recognized.messageSk); return; }
     setStatus("solving");
     setMessage("Stav je precitany. Solver teraz pocita a overuje tahy.");
     speakText("Stav sedi. Pocitam riesenie.");
-
     const solved = await computeSolution(recognized.state);
-
     if (activeJobRef.current !== jobId) return;
-    if (!solved.moves) {
-      setStatus("error");
-      setMessage(solved.status);
-      speakText("Solver tento stav nevie spracovat.");
-      return;
-    }
-
+    if (!solved.moves) { setStatus("error"); setMessage(solved.status); speakText("Solver tento stav nevie spracovat."); return; }
     setMoves(solved.moves);
     setScrambleState(recognized.state);
     setStatus("ready");
-    setMessage(solved.moves.length === 0 ? "Hotovo. Tento Pyraminx je uz vyrieseny." : "Riesenie je pripravene. Rob kroky jeden po druhom.");
+    setMessage(solved.moves.length === 0 ? "Hotovo." : "Riesenie pripravene.");
     speakText(solved.moves.length === 0 ? "Hotovo." : "Riesenie je pripravene.");
   }
 
@@ -292,15 +258,10 @@ export function PhotoUploadPanel() {
     if (!files?.length) return;
     if (imageInputRef.current) imageInputRef.current.value = "";
     const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/")).slice(0, pyraminxFaceIds.length);
-    if (imageFiles.length < pyraminxFaceIds.length) {
-      askForRescan("Potrebujem presne 4 fotky: jednu pre kazdu stranu ihlana.");
-      return;
-    }
+    if (imageFiles.length < pyraminxFaceIds.length) { askForRescan("Potrebujem presne 4 fotky: jednu pre kazdu stranu ihlana."); return; }
     setStatus("capturing");
     setMessage("Fotky mam. Hned ich posielam do AI.");
-    const nextCaptures = await Promise.all(
-      imageFiles.map(async (file, index) => ({ face: pyraminxFaceIds[index], url: await fileToObjectUrl(file) }))
-    );
+    const nextCaptures = await Promise.all(imageFiles.map(async (file, index) => ({ face: pyraminxFaceIds[index], url: await fileToObjectUrl(file) })));
     await solveFromCaptures(nextCaptures);
   }
 
@@ -308,18 +269,12 @@ export function PhotoUploadPanel() {
     const file = files?.[0];
     if (!file) return;
     if (videoInputRef.current) videoInputRef.current.value = "";
-    if (!file.type.startsWith("video/")) {
-      askForRescan("Vybrany subor nie je video.");
-      return;
-    }
+    if (!file.type.startsWith("video/")) { askForRescan("Vybrany subor nie je video."); return; }
     setStatus("capturing");
     setMessage("Video mam. Vyberam 4 snimky a potom spustim AI.");
     speakText("Video mam. Vyberam styri snimky.");
-    try {
-      await solveFromCaptures(await extractVideoFrames(file));
-    } catch {
-      askForRescan("Z videa neviem vybrat 4 snimky. Nahraj kratsie video alebo 4 fotky.");
-    }
+    try { await solveFromCaptures(await extractVideoFrames(file)); }
+    catch { askForRescan("Z videa neviem vybrat 4 snimky. Nahraj kratsie video alebo 4 fotky."); }
   }
 
   function toggleSound() {
@@ -329,72 +284,40 @@ export function PhotoUploadPanel() {
   }
 
   return (
-    <div className="manual-solver">
+    <div className={isReady ? "manual-solver manual-solver-ready" : "manual-solver"}>
+      <style>{`
+        .manual-solver-ready{gap:10px}.manual-solver-ready .primary-guide{align-items:center;display:grid;gap:8px;grid-template-columns:1fr auto;padding:9px 10px}.manual-solver-ready .primary-guide h2{font-size:16px;margin:0}.manual-solver-ready .primary-guide p{display:none}.manual-solver-ready .primary-guide span{display:none}.manual-solver-ready .coach-actions{display:flex;gap:6px}.manual-solver-ready .coach-actions .button{font-size:12px;min-height:34px;padding:7px 9px;width:auto}.manual-solver-ready .ai-guide:not(.primary-guide){display:none}@media(max-width:520px){.manual-solver-ready .primary-guide{grid-template-columns:1fr}.manual-solver-ready .coach-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.manual-solver-ready .coach-actions .button{width:100%}}
+      `}</style>
       <section className="ai-guide primary-guide" aria-live="polite">
         <div>
           <span>Nellys</span>
-          <h2>Ukaz mi ihlan</h2>
+          <h2>{isReady ? "Riesenie" : "Ukaz mi ihlan"}</h2>
           <p>{message}</p>
         </div>
         <div className="coach-actions">
-          <button className="button" onClick={() => imageInputRef.current?.click()} type="button">
-            Nahrat 4 fotky
-          </button>
-          <button className="button secondary" onClick={() => videoInputRef.current?.click()} type="button">
-            Nahrat video
-          </button>
-          <button className="button secondary" onClick={toggleSound} type="button">
-            {soundEnabled ? "Zvuk vypnut" : "Zvuk zapnut"}
-          </button>
+          <button className="button" onClick={() => imageInputRef.current?.click()} type="button">{isReady ? "4 fotky" : "Nahrat 4 fotky"}</button>
+          <button className="button secondary" onClick={() => videoInputRef.current?.click()} type="button">{isReady ? "Video" : "Nahrat video"}</button>
+          <button className="button secondary" onClick={toggleSound} type="button">{soundEnabled ? "Zvuk off" : "Zvuk on"}</button>
         </div>
         <input ref={imageInputRef} accept="image/*" multiple onChange={(event) => void handleImageFiles(event.target.files)} style={{ display: "none" }} type="file" />
         <input ref={videoInputRef} accept="video/*" onChange={(event) => void handleVideoFile(event.target.files)} style={{ display: "none" }} type="file" />
       </section>
 
-      {status === "ready" && moves && scrambleState ? (
+      {isReady ? (
         <SolveGuide moves={moves as PyraminxMove[]} initialState={scrambleState} onSpeak={speakText} />
       ) : status === "analyzing" || status === "solving" || status === "capturing" ? (
-        <section className="scan-status-panel" aria-live="polite">
-          <strong>{status === "solving" ? "Solver pocita tahy" : status === "capturing" ? "Pripravujem snimky" : "AI cita fotky"}</strong>
-          <p>{message}</p>
-          <div className="scan-loader" aria-hidden="true">
-            <span />
-          </div>
-        </section>
+        <section className="scan-status-panel" aria-live="polite"><strong>{status === "solving" ? "Solver pocita tahy" : status === "capturing" ? "Pripravujem snimky" : "AI cita fotky"}</strong><p>{message}</p><div className="scan-loader" aria-hidden="true"><span /></div></section>
       ) : status === "needs_rescan" || status === "error" ? (
-        <section className="rescan-guide action-rescan" aria-live="polite">
-          <strong>Este nemam stav pre solver</strong>
-          <p>{message}</p>
-          <div className="solver-actions">
-            <button className="button" onClick={clearCaptures} type="button">
-              Skenovat znova
-            </button>
-            <button className="button secondary" onClick={() => videoInputRef.current?.click()} type="button">
-              Nahrat video
-            </button>
-          </div>
-        </section>
+        <section className="rescan-guide action-rescan" aria-live="polite"><strong>Este nemam stav pre solver</strong><p>{message}</p><div className="solver-actions"><button className="button" onClick={clearCaptures} type="button">Skenovat znova</button><button className="button secondary" onClick={() => videoInputRef.current?.click()} type="button">Nahrat video</button></div></section>
       ) : (
         <CameraCapture onComplete={solveFromCaptures} onSpeak={speakText} />
       )}
 
-      {captures.length > 0 ? (
+      {captures.length > 0 && !isReady ? (
         <section className="ai-guide">
-          <div>
-            <strong>Posledne snimky</strong>
-            <p>Tieto 4 snimky posielam do AI v poradi U, L, R, B.</p>
-          </div>
-          <div className="camera-thumbs">
-            {captures.map((capture) => (
-              <figure key={capture.face}>
-                <img src={capture.url} alt={`Strana ${capture.face}`} />
-                <figcaption>{capture.face}</figcaption>
-              </figure>
-            ))}
-          </div>
-          <button className="button secondary" onClick={clearCaptures} type="button">
-            Zacat znova
-          </button>
+          <div><strong>Posledne snimky</strong><p>Tieto 4 snimky posielam do AI v poradi U, L, R, B.</p></div>
+          <div className="camera-thumbs">{captures.map((capture) => <figure key={capture.face}><img src={capture.url} alt={`Strana ${capture.face}`} /><figcaption>{capture.face}</figcaption></figure>)}</div>
+          <button className="button secondary" onClick={clearCaptures} type="button">Zacat znova</button>
         </section>
       ) : null}
 
