@@ -324,12 +324,9 @@ export function SolveGuide({
                         dominantBaseline="central"
                         style={{ transformOrigin: `${centroid(markCell)[0]}px ${centroid(markCell)[1]}px` }}
                       >
-                        {ccw ? "CCW" : "CW"}
+                        {ccw ? "↺" : "↻"}
                       </text>
                     ) : null}
-                    <text x={face.labelPos[0]} y={face.labelPos[1]} className="solve-face-label" textAnchor="middle">
-                      {face.label}
-                    </text>
                   </svg>
                 </div>
               );
@@ -340,10 +337,14 @@ export function SolveGuide({
 
       <div className="live-coach" aria-live="polite">
         <small>Krok {stepIndex + 1} z {total}</small>
-        <strong>{move}{turnCount(move) === 2 ? " (dvakrat)" : ""}</strong>
+        <div className="live-coach-move">
+          <span className="live-coach-arrow" aria-hidden="true">{ccw ? "↺" : "↻"}</span>
+          <strong>{move}{turnCount(move) === 2 ? " (dvakrat)" : ""}</strong>
+        </div>
         <p>
           <span className="solve-color-dot" style={{ background: info?.color }} aria-hidden="true" />
           {describeMove(move)} {ccw ? "Otacaj dolava." : "Otacaj doprava."}
+          {turnCount(move) === 2 ? " Zopakuj este raz." : ""}
         </p>
       </div>
 
