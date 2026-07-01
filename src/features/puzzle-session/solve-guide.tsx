@@ -19,14 +19,14 @@ type FaceKey = "U" | "L" | "R" | "B";
 
 type Cell = {
   points: [number, number][];
-  layer: "tip" | "upper" | "middle" | "base";
+  layer: "tip" | "turn" | "still";
 };
 
 const FACE_NAME: Record<FaceKey, string> = {
-  U: "HORNY VRCH",
-  L: "LAVY VRCH",
-  R: "PRAVY VRCH",
-  B: "ZADNY VRCH"
+  U: "horny vrch",
+  L: "lavy vrch",
+  R: "pravy vrch",
+  B: "zadny vrch"
 };
 
 const FACE_SHORT: Record<FaceKey, string> = {
@@ -44,15 +44,15 @@ const FACE_ACCENT: Record<FaceKey, string> = {
 };
 
 const CELLS: Cell[] = [
-  { points: [[50, 5], [38, 27], [62, 27]], layer: "tip" },
-  { points: [[38, 27], [26, 49], [50, 49]], layer: "upper" },
-  { points: [[38, 27], [62, 27], [50, 49]], layer: "upper" },
-  { points: [[62, 27], [50, 49], [74, 49]], layer: "upper" },
-  { points: [[26, 49], [14, 72], [38, 72]], layer: "middle" },
-  { points: [[26, 49], [50, 49], [38, 72]], layer: "middle" },
-  { points: [[50, 49], [38, 72], [62, 72]], layer: "middle" },
-  { points: [[50, 49], [74, 49], [62, 72]], layer: "middle" },
-  { points: [[74, 49], [62, 72], [86, 72]], layer: "middle" }
+  { points: [[50, 4], [37, 28], [63, 28]], layer: "tip" },
+  { points: [[37, 28], [24, 52], [50, 52]], layer: "turn" },
+  { points: [[37, 28], [63, 28], [50, 52]], layer: "turn" },
+  { points: [[63, 28], [50, 52], [76, 52]], layer: "turn" },
+  { points: [[24, 52], [11, 76], [37, 76]], layer: "still" },
+  { points: [[24, 52], [50, 52], [37, 76]], layer: "still" },
+  { points: [[50, 52], [37, 76], [63, 76]], layer: "still" },
+  { points: [[50, 52], [76, 52], [63, 76]], layer: "still" },
+  { points: [[76, 52], [63, 76], [89, 76]], layer: "still" }
 ];
 
 const SPEEDS = [0.5, 1, 2] as const;
@@ -73,9 +73,9 @@ function isCounterClockwise(move: PyraminxMove): boolean {
   return move.endsWith("'");
 }
 
-function getActiveIndexes(move: PyraminxMove): Set<number> {
-  if (isTipMove(move)) return new Set([0]);
-  return new Set([0, 1, 2, 3]);
+function isTurningCell(move: PyraminxMove, index: number): boolean {
+  if (isTipMove(move)) return index === 0;
+  return index <= 3;
 }
 
 function getMoveLabel(move: PyraminxMove): string {
@@ -88,19 +88,12 @@ export function describeMove(move: PyraminxMove): string {
   return getMoveLabel(move);
 }
 
-export function SolveGuide({
-  moves,
-  initialState,
-  onSpeak
-}: {
-  moves: PyraminxMove[];
-  initialState?: PyraminxState;
-  onSpeak?: (text: string) => void;
-}) {
+export function SolveGuide({ moves, initialState, onSpeak }: { moves: PyraminxMove[]; initialState?: PyraminxState; onSpeak?: (text: string) => void; }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const [viewMode, setViewMode] = useState<ViewMode>("model");
+  const [checkOpen, setCheckOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const total = moves.length;
@@ -109,51 +102,29 @@ export function SolveGuide({
   const ccw = move ? isCounterClockwise(move) : false;
   const arrow = ccw ? "↺" : "↻";
   const repeats = move && turnCount(move) === 2 ? "2x" : "1x";
-  const activeIndexes = move ? getActiveIndexes(move) : new Set<number>();
   const baseState = initialState ?? createSolvedState();
   const stateAtStep = useMemo(() => applySequence(baseState, moves.slice(0, stepIndex)), [baseState, moves, stepIndex]);
   const colors = move ? faceStickerColors(stateAtStep, face as FaceId) : faceStickerColors(baseState, "U");
+  const turningCells = move ? CELLS.map((cell, index) => ({ cell, index })).filter(({ index }) => isTurningCell(move, index)) : [];
+  const stillCells = move ? CELLS.map((cell, index) => ({ cell, index })).filter(({ index }) => !isTurningCell(move, index)) : [];
 
+  useEffect(() => { setStepIndex(0); setPlaying(false); setViewMode("model"); setCheckOpen(false); }, [moves]);
+  useEffect(() => { if (move) onSpeak?.(`${stepIndex + 1}. ${getMoveLabel(move)}`); }, [move, onSpeak, stepIndex]);
   useEffect(() => {
-    setStepIndex(0);
-    setPlaying(false);
-    setViewMode("model");
-  }, [moves]);
-
-  useEffect(() => {
-    if (!move) return;
-    onSpeak?.(`${stepIndex + 1}. ${getMoveLabel(move)}`);
-  }, [move, onSpeak, stepIndex]);
-
-  useEffect(() => {
-    if (!playing) {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      return;
-    }
-    if (stepIndex >= total - 1) {
-      setPlaying(false);
-      return;
-    }
-    timerRef.current = setTimeout(() => {
-      setStepIndex((current) => Math.min(current + 1, total - 1));
-    }, 1450 / speed);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
+    if (!playing) { if (timerRef.current) clearTimeout(timerRef.current); return; }
+    if (stepIndex >= total - 1) { setPlaying(false); return; }
+    timerRef.current = setTimeout(() => setStepIndex((current) => Math.min(current + 1, total - 1)), 1450 / speed);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [playing, speed, stepIndex, total]);
 
   if (total === 0) {
-    return (
-      <div className="solve-guide solve-guide-visual">
-        <div className="solution-box"><span>Hotovo</span><p>Pyraminx je vyrieseny.</p></div>
-      </div>
-    );
+    return <div className="solve-guide solve-guide-visual"><div className="solution-box"><span>Hotovo</span><p>Pyraminx je vyrieseny.</p></div></div>;
   }
 
   return (
     <div className="solve-guide solve-guide-visual">
       <style>{`
-        .solve-guide-visual{gap:10px}.solve-guide-visual .solve-mode-tabs{background:rgba(237,243,248,.82);border:0;border-radius:999px;grid-template-columns:repeat(2,minmax(0,1fr));padding:4px}.solve-guide-visual .solve-mode-tab{border-radius:999px;font-size:14px;min-height:42px}.solve-visual-stage{background:radial-gradient(circle at 50% 16%,#182b5d 0,#071226 62%,#030712 100%);border:0;border-radius:18px;box-shadow:0 18px 36px rgba(3,7,18,.25);display:grid;gap:8px;min-height:430px;overflow:hidden;padding:14px;position:relative}.solve-visual-top{align-items:center;color:#dbeafe;display:flex;font-size:12px;font-weight:900;justify-content:space-between;letter-spacing:.04em;text-transform:uppercase}.solve-visual-top strong{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:999px;color:#fff;padding:8px 10px}.solve-visual-model{display:grid;min-height:330px;place-items:center;position:relative}.solve-current-face{filter:drop-shadow(0 26px 34px rgba(0,0,0,.45));height:min(72vw,330px);max-height:330px;max-width:330px;width:min(72vw,330px)}.solve-cell{stroke:#071226;stroke-linejoin:round;stroke-width:1.4}.solve-cell.dim{filter:saturate(.8) brightness(.58);opacity:.52}.solve-cell.active{animation:piece-breathe 1s ease-in-out infinite;filter:brightness(1.22) saturate(1.18) drop-shadow(0 0 9px rgba(255,255,255,.72));stroke:#fff;stroke-width:2.1;transform-box:fill-box;transform-origin:center}.solve-cell.active.ccw{animation-name:piece-breathe-ccw}.solve-cell-outline{fill:none;stroke:rgba(255,255,255,.84);stroke-width:1.7}.solve-big-arrow{animation:arrow-spin-cw 1.1s ease-in-out infinite;color:#fff;display:grid;filter:drop-shadow(0 8px 12px rgba(0,0,0,.55));font-size:82px;font-weight:900;inset:0;line-height:1;place-items:center;pointer-events:none;position:absolute;text-shadow:0 0 0 #071226,0 0 16px rgba(59,130,246,.92);transform-origin:center}.solve-big-arrow.ccw{animation-name:arrow-spin-ccw}.solve-repeat-pill{background:#fff;border:3px solid rgba(59,130,246,.75);border-radius:999px;bottom:22px;color:#071226;font-size:22px;font-weight:1000;left:50%;padding:8px 16px;position:absolute;transform:translateX(-50%)}.solve-visual-foot{align-items:center;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);border-radius:14px;color:#fff;display:grid;gap:6px;grid-template-columns:1fr auto;padding:10px 12px}.solve-visual-foot span{color:#bfdbfe;font-size:12px;font-weight:900;text-transform:uppercase}.solve-visual-foot strong{font-size:22px;line-height:1}.solve-visual-foot b{background:rgba(255,255,255,.92);border-radius:999px;color:#071226;padding:8px 10px}.solve-guide-visual .solve-controls{grid-template-columns:repeat(3,minmax(0,1fr))}.solve-guide-visual .speed-controls{grid-template-columns:repeat(3,minmax(0,1fr))}.solve-guide-visual .all-guide-steps:not([open]){margin-top:0}.solve-guide-visual .all-guide-steps[open]{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}@keyframes piece-breathe{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(10deg) scale(1.05)}}@keyframes piece-breathe-ccw{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(-10deg) scale(1.05)}}@keyframes arrow-spin-cw{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(38deg) scale(1.06)}}@keyframes arrow-spin-ccw{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(-38deg) scale(1.06)}}@media(max-width:520px){.solve-visual-stage{min-height:390px;padding:12px}.solve-current-face{height:min(78vw,300px);width:min(78vw,300px)}.solve-big-arrow{font-size:70px}.solve-repeat-pill{bottom:18px;font-size:18px}.solve-visual-foot strong{font-size:19px}}
+        .solve-guide-visual{gap:10px}.solve-guide-visual .solve-mode-tabs{background:rgba(237,243,248,.82);border:0;border-radius:999px;grid-template-columns:repeat(2,minmax(0,1fr));padding:4px}.solve-guide-visual .solve-mode-tab{border-radius:999px;font-size:14px;min-height:40px}.solve-visual-stage{background:radial-gradient(circle at 50% 13%,#16275a 0,#071226 62%,#030712 100%);border:0;border-radius:18px;box-shadow:0 18px 36px rgba(3,7,18,.25);display:grid;gap:8px;min-height:405px;overflow:hidden;padding:12px;position:relative}.solve-visual-top{align-items:center;color:#dbeafe;display:flex;font-size:12px;font-weight:900;justify-content:space-between;letter-spacing:.04em;text-transform:uppercase}.solve-visual-top strong{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:999px;color:#fff;padding:7px 10px}.solve-visual-model{display:grid;min-height:300px;place-items:center;position:relative}.solve-current-face{filter:drop-shadow(0 26px 34px rgba(0,0,0,.45));height:min(76vw,330px);max-height:330px;max-width:330px;width:min(76vw,330px)}.solve-cell{stroke:#071226;stroke-linejoin:round;stroke-width:1.4}.solve-still-layer .solve-cell{filter:saturate(.8) brightness(.58);opacity:.46}.solve-turn-layer{animation:layer-turn-cw 1.2s cubic-bezier(.32,.9,.28,1) infinite;filter:brightness(1.18) saturate(1.15) drop-shadow(0 0 12px rgba(255,255,255,.74));transform-box:view-box;transform-origin:50px 28px}.solve-turn-layer.ccw{animation-name:layer-turn-ccw}.solve-turn-layer.tip{transform-origin:50px 16px}.solve-turn-layer .solve-cell{stroke:#fff;stroke-width:2.2}.solve-cell-outline{fill:none;stroke:rgba(255,255,255,.86);stroke-width:1.8}.solve-cut-line{stroke:rgba(255,255,255,.65);stroke-dasharray:3 3;stroke-width:1.3}.solve-big-arrow{animation:arrow-float-cw 1.2s ease-in-out infinite;color:#fff;display:grid;filter:drop-shadow(0 8px 12px rgba(0,0,0,.55));font-size:78px;font-weight:900;inset:0;line-height:1;place-items:center;pointer-events:none;position:absolute;text-shadow:0 0 0 #071226,0 0 16px rgba(59,130,246,.92);transform-origin:center 35%}.solve-big-arrow.ccw{animation-name:arrow-float-ccw}.solve-repeat-pill{background:#fff;border:3px solid rgba(59,130,246,.75);border-radius:999px;bottom:10px;color:#071226;font-size:21px;font-weight:1000;left:50%;padding:7px 15px;position:absolute;transform:translateX(-50%)}.solve-visual-foot{align-items:center;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);border-radius:14px;color:#fff;display:grid;gap:6px;grid-template-columns:1fr auto;padding:9px 11px}.solve-visual-foot span{color:#bfdbfe;font-size:12px;font-weight:900;text-transform:uppercase}.solve-visual-foot strong{font-size:21px;line-height:1}.solve-visual-foot b{background:rgba(255,255,255,.92);border-radius:999px;color:#071226;padding:8px 10px}.solve-check-card{background:#eef6ff;border:1px solid #bcd7ff;border-radius:14px;display:grid;gap:8px;padding:12px}.solve-check-card strong{font-size:16px}.solve-check-card p{margin:0}.solve-guide-visual .solve-controls{grid-template-columns:repeat(4,minmax(0,1fr))}.solve-guide-visual .speed-controls{grid-template-columns:repeat(3,minmax(0,1fr))}.solve-guide-visual .all-guide-steps:not([open]){margin-top:0}.solve-guide-visual .all-guide-steps[open]{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}@keyframes layer-turn-cw{0%,100%{transform:rotate(0deg)}52%{transform:rotate(120deg)}}@keyframes layer-turn-ccw{0%,100%{transform:rotate(0deg)}52%{transform:rotate(-120deg)}}@keyframes arrow-float-cw{0%,100%{transform:rotate(0deg) scale(1)}52%{transform:rotate(48deg) scale(1.08)}}@keyframes arrow-float-ccw{0%,100%{transform:rotate(0deg) scale(1)}52%{transform:rotate(-48deg) scale(1.08)}}@media(max-width:520px){.solve-visual-stage{min-height:365px}.solve-current-face{height:min(78vw,295px);width:min(78vw,295px)}.solve-big-arrow{font-size:68px}.solve-repeat-pill{font-size:18px}.solve-visual-foot strong{font-size:19px}.solve-guide-visual .solve-controls{grid-template-columns:1fr 1fr}.solve-guide-visual .solve-controls .button{width:100%}}
       `}</style>
 
       <div className="solve-mode-tabs" aria-label="Zobrazenie riesenia">
@@ -165,29 +136,33 @@ export function SolveGuide({
         <div className="solve-visual-top"><span>KROK {stepIndex + 1} / {total}</span><strong>{FACE_NAME[face]}</strong></div>
         <div className="solve-visual-model">
           <svg className="solve-current-face" viewBox="0 0 100 82" aria-hidden="true">
-            {CELLS.map((cell, idx) => {
-              const active = activeIndexes.has(idx);
-              return (
-                <polygon
-                  key={idx}
-                  className={active ? `solve-cell active ${ccw ? "ccw" : "cw"}` : "solve-cell dim"}
-                  points={pointsAttr(cell.points)}
-                  style={{ fill: STICKER_COLOR[colors[idx]] }}
-                />
-              );
-            })}
-            <polygon className="solve-cell-outline" points="50,5 14,72 86,72" />
+            <g className="solve-still-layer">
+              {stillCells.map(({ cell, index }) => <polygon key={index} className="solve-cell" points={pointsAttr(cell.points)} style={{ fill: STICKER_COLOR[colors[index]] }} />)}
+            </g>
+            <g className={isTipMove(move) ? `solve-turn-layer tip ${ccw ? "ccw" : "cw"}` : `solve-turn-layer ${ccw ? "ccw" : "cw"}`}>
+              {turningCells.map(({ cell, index }) => <polygon key={index} className="solve-cell" points={pointsAttr(cell.points)} style={{ fill: STICKER_COLOR[colors[index]] }} />)}
+            </g>
+            <line className="solve-cut-line" x1="24" y1="52" x2="76" y2="52" />
+            <polygon className="solve-cell-outline" points="50,4 11,76 89,76" />
           </svg>
           <div className={ccw ? "solve-big-arrow ccw" : "solve-big-arrow"} aria-hidden="true">{arrow}</div>
           <div className="solve-repeat-pill">{repeats}</div>
         </div>
-        <div className="solve-visual-foot"><div><span>Teraz</span><strong>{move}</strong></div><b style={{ color: FACE_ACCENT[face] }}>{ccw ? "dolava" : "doprava"}</b></div>
+        <div className="solve-visual-foot"><div><span>Teraz otoc</span><strong>{move}</strong></div><b style={{ color: FACE_ACCENT[face] }}>{ccw ? "dolava" : "doprava"}</b></div>
       </div>
+
+      {checkOpen ? (
+        <div className="solve-check-card" aria-live="polite">
+          <strong>Kontrola po kroku {stepIndex + 1}</strong>
+          <p>Ukaz jednu hotovu viditelnu stranu do kamery. Nellys ju porovna s ocakavanym stavom a povie, ci pokracovat alebo vratit krok.</p>
+        </div>
+      ) : null}
 
       <div className="solve-controls">
         <button className="button secondary" disabled={stepIndex === 0} onClick={() => setStepIndex((current) => Math.max(0, current - 1))} type="button">Spat</button>
         <button className="button" onClick={() => setPlaying((current) => !current)} type="button">{playing ? "Pauza" : "Prehrat"}</button>
         <button className="button secondary" disabled={stepIndex >= total - 1} onClick={() => setStepIndex((current) => Math.min(total - 1, current + 1))} type="button">Dalej</button>
+        <button className="button secondary" onClick={() => setCheckOpen((current) => !current)} type="button">Kontrola</button>
       </div>
 
       <div className="speed-controls" aria-label="Rychlost animacie">
