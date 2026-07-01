@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { pyraminxFaceIds, type PyraminxFaceId, type StickerColorId } from "@/lib/domain/pyraminx/media-inspection";
-import { decodeNearestStateFromFaceColors, decodeStateFromFaceColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
+import { decodeNearestStateFromFaceColors, type FaceId } from "@/lib/domain/pyraminx/stickers";
 import { analyzePyraminxImagesFast } from "@/lib/server/ai/gemini-fast";
 import { analyzePyraminxImages } from "@/lib/server/ai/anthropic-vision";
 import { requireActorFromSessionCookie } from "@/lib/server/auth/require-actor";
@@ -50,19 +50,6 @@ export async function POST(request: Request) {
     combined = fallback;
   }
 
-  const duplicate = findLikelyDuplicateFaces(combined.faces);
-  if (duplicate) {
-    return NextResponse.json(
-      {
-        ok: false,
-        code: "duplicate_faces",
-        messageSk: `Snimky ${duplicate[0]} a ${duplicate[1]} vyzeraju ako ta ista strana. Odfot ${duplicate[1]} znova po otoceni celeho ihlana.`,
-        requiresRescan: true
-      },
-      { status: 200 }
-    );
-  }
-
   const decoded = decodeStateFromAnyOrientation(pyraminxFaceIds.map((face) => combined.faces[face]));
   if (!decoded.state) {
     return NextResponse.json(
@@ -77,23 +64,6 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, state: decoded.state, corrections: decoded.corrections });
-}
-
-function findLikelyDuplicateFaces(faces: Record<PyraminxFaceId, StickerColorId[]>): [PyraminxFaceId, PyraminxFaceId] | null {
-  for (let first = 0; first < pyraminxFaceIds.length; first += 1) {
-    for (let second = first + 1; second < pyraminxFaceIds.length; second += 1) {
-      const faceA = pyraminxFaceIds[first];
-      const faceB = pyraminxFaceIds[second];
-      const colorsA = faces[faceA];
-      const bestDifference = Math.min(
-        ...FACE_ORIENTATION_TRANSFORMS.map((transform) =>
-          transform.reduce((total, sourceIndex, index) => total + Number(colorsA[index] !== faces[faceB][sourceIndex]), 0)
-        )
-      );
-      if (bestDifference === 0) return [faceA, faceB];
-    }
-  }
-  return null;
 }
 
 function buildFaceAssignments(): FaceId[][] {
@@ -121,8 +91,6 @@ function decodeStateFromAnyOrientation(sampledFaces: StickerColorId[][]) {
 
   for (const assignment of FACE_ASSIGNMENTS) {
     const faceColors = {} as Record<FaceId, StickerColorId[]>;
-    const state = tryAssignment(assignment, options, faceColors, 0);
-    if (state) return { state, corrections: 0 };
     const candidate = findNearestAssignment(assignment, options, faceColors, 0);
     if (!nearest || candidate.mismatches < nearest.mismatches) nearest = candidate;
   }
@@ -163,24 +131,4 @@ function buildFaceOrientationOptions(colors: StickerColorId[]): StickerColorId[]
   }
 
   return variants;
-}
-
-function tryAssignment(
-  assignment: FaceId[],
-  options: StickerColorId[][][],
-  faceColors: Record<FaceId, StickerColorId[]>,
-  index: number
-) {
-  if (index === assignment.length) {
-    return decodeStateFromFaceColors(faceColors);
-  }
-
-  const face = assignment[index];
-  for (const colors of options[index]) {
-    faceColors[face] = colors;
-    const state = tryAssignment(assignment, options, faceColors, index + 1);
-    if (state) return state;
-  }
-
-  return null;
 }
