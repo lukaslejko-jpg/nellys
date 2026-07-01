@@ -15,27 +15,24 @@ const STICKER_COLOR: Record<StickerColorId, string> = {
 };
 
 type FaceKey = "top" | "left" | "right" | "center";
-type ViewMode = "camera" | "model" | "steps";
+type ViewMode = "model" | "steps";
 
-const FACES: Record<
-  FaceKey,
-  { points: [number, number][]; apexIdx: number; faceId: FaceId; labelPos: [number, number]; label: string }
-> = {
-  top: { points: [[50, 8], [28, 48], [72, 48]], apexIdx: 0, faceId: "U", labelPos: [50, 30], label: "HORE" },
-  left: { points: [[28, 48], [6, 88], [50, 88]], apexIdx: 0, faceId: "L", labelPos: [28, 70], label: "VLAVO" },
-  right: { points: [[72, 48], [94, 88], [50, 88]], apexIdx: 0, faceId: "R", labelPos: [72, 70], label: "VPRAVO" },
-  center: { points: [[50, 88], [28, 48], [72, 48]], apexIdx: 0, faceId: "B", labelPos: [50, 65], label: "K TEBE" }
+const FACES: Record<FaceKey, { points: [number, number][]; apexIdx: number; faceId: FaceId; label: string }> = {
+  top: { points: [[50, 8], [28, 48], [72, 48]], apexIdx: 0, faceId: "U", label: "HORE" },
+  left: { points: [[28, 48], [6, 88], [50, 88]], apexIdx: 0, faceId: "L", label: "VLAVO" },
+  right: { points: [[72, 48], [94, 88], [50, 88]], apexIdx: 0, faceId: "R", label: "VPRAVO" },
+  center: { points: [[50, 88], [28, 48], [72, 48]], apexIdx: 0, faceId: "B", label: "ZADOK" }
 };
 
-const FACE_INFO: Record<string, { label: string; name: string; hold: string; face: FaceKey; color: string }> = {
-  U: { label: "hornom vrchole", name: "HORNY VRCH", hold: "Chyt horny vrchol", face: "top", color: "var(--blue)" },
-  u: { label: "malom hornom vrchole", name: "MALY HORNY HROT", hold: "Chyt maly horny hrot", face: "top", color: "var(--blue)" },
-  L: { label: "lavom vrchole", name: "LAVY VRCH", hold: "Chyt lavy vrchol", face: "left", color: "var(--green)" },
-  l: { label: "malom lavom vrchole", name: "MALY LAVY HROT", hold: "Chyt maly lavy hrot", face: "left", color: "var(--green)" },
-  R: { label: "pravom vrchole", name: "PRAVY VRCH", hold: "Chyt pravy vrchol", face: "right", color: "var(--red)" },
-  r: { label: "malom pravom vrchole", name: "MALY PRAVY HROT", hold: "Chyt maly pravy hrot", face: "right", color: "var(--red)" },
-  B: { label: "zadnom vrchole", name: "ZADNY VRCH", hold: "Chyt zadny vrchol", face: "center", color: "var(--yellow)" },
-  b: { label: "malom zadnom vrchole", name: "MALY ZADNY HROT", hold: "Chyt maly zadny hrot", face: "center", color: "var(--yellow)" }
+const FACE_INFO: Record<string, { name: string; short: string; face: FaceKey; color: string }> = {
+  U: { name: "horny vrch", short: "horny", face: "top", color: "var(--blue)" },
+  u: { name: "maly horny hrot", short: "hrot hore", face: "top", color: "var(--blue)" },
+  L: { name: "lavy vrch", short: "lavy", face: "left", color: "var(--green)" },
+  l: { name: "maly lavy hrot", short: "hrot vlavo", face: "left", color: "var(--green)" },
+  R: { name: "pravy vrch", short: "pravy", face: "right", color: "var(--red)" },
+  r: { name: "maly pravy hrot", short: "hrot vpravo", face: "right", color: "var(--red)" },
+  B: { name: "zadny vrch", short: "zadny", face: "center", color: "var(--yellow)" },
+  b: { name: "maly zadny hrot", short: "hrot vzadu", face: "center", color: "var(--yellow)" }
 };
 
 function gridPoint(a: [number, number], b: [number, number], c: [number, number], i: number, j: number): [number, number] {
@@ -49,24 +46,21 @@ function subdivideFace(points: [number, number][], apexIdx: number): [number, nu
   const a = points[apexIdx];
   const [b, c] = [0, 1, 2].filter((i) => i !== apexIdx).map((i) => points[i]);
   const g = (i: number, j: number) => gridPoint(a, b, c, i, j);
-
-  const cells: [number, number][][] = new Array(9);
-  cells[0] = [g(0, 0), g(1, 0), g(0, 1)];
-  cells[1] = [g(1, 0), g(2, 0), g(1, 1)];
-  cells[2] = [g(1, 0), g(0, 1), g(1, 1)];
-  cells[3] = [g(0, 1), g(1, 1), g(0, 2)];
-  cells[4] = [g(2, 0), g(3, 0), g(2, 1)];
-  cells[5] = [g(1, 1), g(0, 2), g(1, 2)];
-  cells[6] = [g(1, 1), g(2, 1), g(1, 2)];
-  cells[7] = [g(2, 0), g(1, 1), g(2, 1)];
-  cells[8] = [g(0, 2), g(1, 2), g(0, 3)];
-  return cells;
+  return [
+    [g(0, 0), g(1, 0), g(0, 1)],
+    [g(1, 0), g(2, 0), g(1, 1)],
+    [g(1, 0), g(0, 1), g(1, 1)],
+    [g(0, 1), g(1, 1), g(0, 2)],
+    [g(2, 0), g(3, 0), g(2, 1)],
+    [g(1, 1), g(0, 2), g(1, 2)],
+    [g(1, 1), g(2, 1), g(1, 2)],
+    [g(2, 0), g(1, 1), g(2, 1)],
+    [g(0, 2), g(1, 2), g(0, 3)]
+  ];
 }
 
 function centroid(points: [number, number][]): [number, number] {
-  const x = points.reduce((sum, [px]) => sum + px, 0) / points.length;
-  const y = points.reduce((sum, [, py]) => sum + py, 0) / points.length;
-  return [x, y];
+  return [points.reduce((sum, [x]) => sum + x, 0) / points.length, points.reduce((sum, [, y]) => sum + y, 0) / points.length];
 }
 
 function pointsAttr(points: [number, number][]): string {
@@ -83,7 +77,6 @@ const VERTEX_3D: Record<"u" | "l" | "r" | "b", Vec3> = {
   l: [-UNIT * 0.8165, UNIT / 3, -UNIT * 0.4714],
   r: [UNIT * 0.8165, UNIT / 3, -UNIT * 0.4714]
 };
-
 const FACE_VERTEX_LETTERS: Record<FaceId, ["u" | "l" | "r" | "b", "u" | "l" | "r" | "b", "u" | "l" | "r" | "b"]> = {
   U: ["u", "l", "r"],
   L: ["l", "u", "b"],
@@ -120,11 +113,8 @@ function faceMatrix3d(local: [number, number][], world: Vec3[]): string {
 const SPEEDS = [0.5, 1, 2] as const;
 
 export function describeMove(move: PyraminxMove): string {
-  const face = baseFace(move);
-  const info = FACE_INFO[face];
-  const ccw = move.endsWith("'");
-  const direction = ccw ? "dolava" : "doprava";
-  return `${info.hold}. Otoc ${direction}.`;
+  const info = FACE_INFO[baseFace(move)];
+  return `${info.short}: ${move.endsWith("'") ? "dolava" : "doprava"}`;
 }
 
 export function SolveGuide({ moves, initialState, onSpeak }: { moves: PyraminxMove[]; initialState?: PyraminxState; onSpeak?: (text: string) => void; }) {
@@ -137,16 +127,15 @@ export function SolveGuide({ moves, initialState, onSpeak }: { moves: PyraminxMo
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const total = moves.length;
   const move = moves[stepIndex];
-  const info = move ? FACE_INFO[baseFace(move)] : undefined;
+  const info = move ? FACE_INFO[baseFace(move)] : FACE_INFO.U;
   const ccw = move?.endsWith("'") ?? false;
-  const directionWord = ccw ? "DOĽAVA" : "DOPRAVA";
   const arrow = ccw ? "↺" : "↻";
   const repeats = move && turnCount(move) === 2 ? "2x" : "1x";
+  const direction = ccw ? "dolava" : "doprava";
 
   const baseState = initialState ?? createSolvedState();
   const stateAtStep = useMemo(() => applySequence(baseState, moves.slice(0, stepIndex)), [baseState, moves, stepIndex]);
   const stateAfterStep = useMemo(() => (move ? applyMove(stateAtStep, move) : stateAtStep), [stateAtStep, move]);
-
   const changedCellsByFace = useMemo(() => {
     const result: Partial<Record<FaceId, Set<number>>> = {};
     if (!move) return result;
@@ -162,11 +151,11 @@ export function SolveGuide({ moves, initialState, onSpeak }: { moves: PyraminxMo
   }, [stateAtStep, stateAfterStep, move]);
 
   useEffect(() => { setStepIndex(0); setPlaying(false); setViewMode("model"); }, [moves]);
-  useEffect(() => { if (move) onSpeak?.(`Krok ${stepIndex + 1} z ${total}. ${describeMove(move)}`); }, [stepIndex, moves, move, onSpeak, total]);
+  useEffect(() => { if (move) onSpeak?.(`Krok ${stepIndex + 1}. ${info.name}. ${direction}. ${repeats}`); }, [stepIndex, moves, move, onSpeak, info.name, direction, repeats]);
   useEffect(() => {
     if (!playing) { if (timerRef.current) clearTimeout(timerRef.current); return; }
     if (stepIndex >= total - 1) { setPlaying(false); return; }
-    timerRef.current = setTimeout(() => setStepIndex((current) => Math.min(current + 1, total - 1)), 1600 / speed);
+    timerRef.current = setTimeout(() => setStepIndex((current) => Math.min(current + 1, total - 1)), 1500 / speed);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [playing, speed, stepIndex, total]);
 
@@ -178,38 +167,25 @@ export function SolveGuide({ moves, initialState, onSpeak }: { moves: PyraminxMo
   }
   function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); dragRef.current = null; }
 
-  if (total === 0) {
-    return <div className="solve-guide"><div className="solution-box"><span>Hotovo</span><p>Pyraminx je uz vyrieseny.</p></div></div>;
-  }
+  if (total === 0) return <div className="solve-guide"><div className="solution-box"><span>Hotovo</span><p>Pyraminx je vyrieseny.</p></div></div>;
 
   return (
-    <div className="solve-guide">
+    <div className="solve-guide visual-solve-guide">
+      <style>{`
+        .visual-solve-guide .solve-mode-tabs{margin-top:0}.visual-solve-guide .solve-orientation-hint,.visual-solve-guide .live-coach{display:none}.visual-solve-guide .solve-stage{border-radius:18px;margin-top:0;min-height:390px;padding:10px 10px 16px}.solve-hud{align-items:center;display:grid;grid-template-columns:auto 1fr auto;gap:10px;left:12px;position:absolute;right:12px;top:12px;z-index:8}.solve-chip{background:rgba(255,255,255,.92);border-radius:14px;color:#0b1220;display:grid;line-height:1;padding:9px 11px}.solve-chip small{color:#2d6cdf;font-size:10px;font-weight:900;text-transform:uppercase}.solve-chip strong{font-size:17px}.solve-arrow-chip{align-items:center;background:#0b1220;border:2px solid rgba(255,255,255,.85);border-radius:18px;color:#fff;display:grid;font-size:38px;font-weight:900;justify-items:center;line-height:.95;min-width:76px;padding:9px}.solve-arrow-chip span:last-child{font-size:13px;letter-spacing:.08em}.visual-solve-guide .solve-scene-wrap{padding-top:58px}.visual-solve-guide .solve-scene{height:300px;max-width:300px;width:300px}.solve-piece-moving{animation:piece-turn-cw 1.05s ease-in-out infinite;filter:brightness(1.2) drop-shadow(0 0 8px rgba(255,255,255,.85));stroke:#fff!important;stroke-width:2!important;transform-box:fill-box;transform-origin:center}.solve-piece-moving.ccw{animation-name:piece-turn-ccw}.visual-solve-guide .solve-face-outline-active{stroke:#fff;stroke-width:4}.visual-solve-guide .solve-mark-arrow{fill:#fff;font-size:30px;stroke:#0b1220;stroke-width:1.2}@keyframes piece-turn-cw{0%,100%{transform:rotate(0deg)}50%{transform:rotate(120deg)}}@keyframes piece-turn-ccw{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-120deg)}}.mini-stepbar{align-items:center;display:grid;grid-template-columns:auto 1fr auto;gap:10px}.mini-stepbar strong{font-size:18px}.mini-stepbar span{color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase}@media(max-width:520px){.visual-solve-guide .solve-stage{min-height:355px}.visual-solve-guide .solve-scene{height:265px;max-width:265px;width:265px}.solve-chip strong{font-size:15px}.solve-arrow-chip{font-size:32px;min-width:64px}}
+      `}</style>
       <div className="solve-mode-tabs" aria-label="Zobrazenie riesenia">
-        <button className={viewMode === "camera" ? "solve-mode-tab active" : "solve-mode-tab"} onClick={() => setViewMode("camera")} type="button">Kamera</button>
         <button className={viewMode === "model" ? "solve-mode-tab active" : "solve-mode-tab"} onClick={() => setViewMode("model")} type="button">Model</button>
         <button className={viewMode === "steps" ? "solve-mode-tab active" : "solve-mode-tab"} onClick={() => setViewMode("steps")} type="button">Kroky</button>
       </div>
 
-      <div className="solve-action-card" style={{ border: "3px solid #2d6cdf", borderRadius: 12, padding: 12, background: "#ffffff", display: "grid", gap: 10 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 70px", gap: 8, alignItems: "stretch" }}>
-          <div style={{ background: "#eef6ff", borderRadius: 10, padding: 10 }}>
-            <small style={{ color: "#2d6cdf", fontWeight: 900 }}>CHYT</small>
-            <strong style={{ display: "block", fontSize: 18 }}>{info?.name}</strong>
-          </div>
-          <div style={{ background: ccw ? "#fff7ed" : "#f0fdf4", borderRadius: 10, padding: 10 }}>
-            <small style={{ color: "#2d6cdf", fontWeight: 900 }}>OTOČ</small>
-            <strong style={{ display: "block", fontSize: 18 }}>{directionWord}</strong>
-          </div>
-          <div style={{ alignItems: "center", background: "#111827", borderRadius: 10, color: "#fff", display: "grid", fontSize: 28, fontWeight: 900, justifyItems: "center" }}>
-            <span>{arrow}</span><span style={{ fontSize: 14 }}>{repeats}</span>
-          </div>
-        </div>
-      </div>
-
-      <p className="solve-orientation-hint">Na modeli svietia dieliky, ktore sa maju pohnut. Rob iba tento jeden krok.</p>
-
       <div className="solve-stage solve-stage-3d">
-        <div className="solve-model-title"><span>Krok {stepIndex + 1} / {total}</span><strong>Teraz: {info?.name}</strong></div>
+        <div className="solve-hud">
+          <div className="solve-chip"><small>cast</small><strong>{info.name}</strong></div>
+          <div className="solve-chip"><small>smer</small><strong>{direction}</strong></div>
+          <div className="solve-arrow-chip" aria-hidden="true"><span>{arrow}</span><span>{repeats}</span></div>
+        </div>
+        <div className="solve-model-title"><span>Krok {stepIndex + 1} / {total}</span><strong>{move}</strong></div>
         <div className="solve-scene-wrap" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}>
           <div className="solve-scene" style={{ transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)` }}>
             {(Object.keys(FACES) as FaceKey[]).map((key) => {
@@ -223,9 +199,11 @@ export function SolveGuide({ moves, initialState, onSpeak }: { moves: PyraminxMo
               return (
                 <div key={key} className="solve-face-3d" style={{ transform: faceMatrix3d(face.points, world3d) }}>
                   <svg className="solve-face-svg" width={100} height={100} viewBox="0 0 100 100" aria-hidden="true">
-                    {cells.map((cell, idx) => <polygon key={idx} className={changedCells?.has(idx) ? "solve-piece solve-piece-active" : "solve-piece"} points={pointsAttr(cell)} style={{ fill: STICKER_COLOR[cellColors[idx]] }} />)}
+                    {cells.map((cell, idx) => (
+                      <polygon key={idx} className={changedCells?.has(idx) ? `solve-piece solve-piece-active solve-piece-moving ${ccw ? "ccw" : "cw"}` : "solve-piece"} points={pointsAttr(cell)} style={{ fill: STICKER_COLOR[cellColors[idx]] }} />
+                    ))}
                     <polygon className={isActive ? "solve-face-outline solve-face-outline-active" : "solve-face-outline"} points={pointsAttr(face.points)} />
-                    {isActive && markCell ? <text x={centroid(markCell)[0]} y={centroid(markCell)[1]} className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"} textAnchor="middle" dominantBaseline="central" style={{ transformOrigin: `${centroid(markCell)[0]}px ${centroid(markCell)[1]}px` }}>{arrow}</text> : null}
+                    {isActive && markCell ? <text x={centroid(markCell)[0]} y={centroid(markCell)[1]} className={ccw ? "solve-mark-arrow ccw" : "solve-mark-arrow cw"} textAnchor="middle" dominantBaseline="central">{arrow}</text> : null}
                   </svg>
                 </div>
               );
@@ -234,27 +212,18 @@ export function SolveGuide({ moves, initialState, onSpeak }: { moves: PyraminxMo
         </div>
       </div>
 
-      <div className="live-coach" aria-live="polite">
-        <small>Krok {stepIndex + 1} z {total}</small>
-        <div className="live-coach-move"><span className="live-coach-arrow" aria-hidden="true">{arrow}</span><strong>{move}{turnCount(move) === 2 ? " (2x)" : ""}</strong></div>
-        <p><span className="solve-color-dot" style={{ background: info?.color }} aria-hidden="true" />{info?.hold}. Otoc {directionWord.toLowerCase()}.{turnCount(move) === 2 ? " Urob to dvakrat." : ""}</p>
-      </div>
-
+      <div className="mini-stepbar"><span>Krok {stepIndex + 1}/{total}</span><strong>{info.short} {arrow} {repeats}</strong><span>{move}</span></div>
       <div className="solve-controls">
         <button className="button secondary" disabled={stepIndex === 0} onClick={() => setStepIndex((current) => Math.max(0, current - 1))} type="button">Spat</button>
         <button className="button" onClick={() => setPlaying((current) => !current)} type="button">{playing ? "Pauza" : "Prehrat"}</button>
         <button className="button secondary" disabled={stepIndex >= total - 1} onClick={() => setStepIndex((current) => Math.min(total - 1, current + 1))} type="button">Dalej</button>
       </div>
-
       <div className="speed-controls" aria-label="Rychlost animacie">
         {SPEEDS.map((value) => <button className={speed === value ? "face-tab active" : "face-tab"} key={value} onClick={() => setSpeed(value)} type="button">x{value}</button>)}
       </div>
-
       <details className="all-guide-steps" open={viewMode === "steps"}>
-        <summary>Zobrazit vsetky kroky ({total})</summary>
-        <ol className="guide-steps">
-          {moves.map((stepMove, index) => <li key={`${stepMove}-${index}`}><button className={index === stepIndex ? "step-jump active" : "step-jump"} onClick={() => { setPlaying(false); setStepIndex(index); }} type="button"><span>{index + 1}</span><p>{stepMove} - {describeMove(stepMove)}</p></button></li>)}
-        </ol>
+        <summary>Vsetky kroky ({total})</summary>
+        <ol className="guide-steps">{moves.map((stepMove, index) => <li key={`${stepMove}-${index}`}><button className={index === stepIndex ? "step-jump active" : "step-jump"} onClick={() => { setPlaying(false); setStepIndex(index); }} type="button"><span>{index + 1}</span><p>{stepMove} - {describeMove(stepMove)}</p></button></li>)}</ol>
       </details>
     </div>
   );
