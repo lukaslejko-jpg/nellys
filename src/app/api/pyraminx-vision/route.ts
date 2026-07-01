@@ -90,7 +90,7 @@ function findLikelyDuplicateFaces(faces: Record<PyraminxFaceId, StickerColorId[]
           transform.reduce((total, sourceIndex, index) => total + Number(colorsA[index] !== faces[faceB][sourceIndex]), 0)
         )
       );
-      if (bestDifference <= 1) return [faceA, faceB];
+      if (bestDifference === 0) return [faceA, faceB];
     }
   }
   return null;
